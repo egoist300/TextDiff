@@ -235,7 +235,22 @@ Describe "Get-DiffAlignment" {
                 $rows = @(Get-DiffAlignment -BeforeLines @('a', 'b') -AfterLines @('x', 'y'))
 
                 foreach ($row in $rows) {
-                    $row.ContainsKey('Order') | Should -BeFalse
+                    @($row.PSObject.Properties | ForEach-Object -Process { $_.Name }) -ccontains 'Order' | Should -BeFalse
+                }
+            }
+        }
+
+        It "行は型名 TextDiff.DiffRow の PSCustomObject で、項目は Kind, LeftNo, RightNo, Left, Right の順" {
+            InModuleScope TextDiff {
+                # ハッシュテーブルで返すと、画面に出したときに Name と Value の縦の一覧になり、
+                # Format-Table や Select-Object で列として扱えない
+                $rows = @(Get-DiffAlignment -BeforeLines @('a', 'b', 'c') -AfterLines @('a', 'x', 'c', 'd'))
+
+                $rows.Count | Should -BeGreaterThan 0
+                foreach ($row in $rows) {
+                    $row -is [System.Management.Automation.PSCustomObject] | Should -BeTrue
+                    $row.PSObject.TypeNames[0] | Should -BeExactly 'TextDiff.DiffRow'
+                    (@($row.PSObject.Properties | ForEach-Object -Process { $_.Name }) -join ',') | Should -BeExactly 'Kind,LeftNo,RightNo,Left,Right'
                 }
             }
         }

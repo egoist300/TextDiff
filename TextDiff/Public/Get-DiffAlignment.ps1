@@ -48,15 +48,13 @@ function Get-DiffAlignment {
         削除と追加を Changed として対にする類似度の下限（0.0〜1.0）。
         既定 0.5 は「行の半分以上が共通なら同じ行の書き換えとみなす」意味。
     .OUTPUTS
-        [hashtable[]]
-        @{
+        TextDiff.DiffRow。次の項目を持つ [PSCustomObject] を、before/after の並び順で返します。
             Kind    = 'Same' | 'Changed' | 'Deleted' | 'Added'
             LeftNo  = before の行番号（1 始まり）。Added のときは $null
             RightNo = after の行番号（1 始まり）。Deleted のときは $null
             Left    = before の行の内容。Added のときは $null
             Right   = after の行の内容。Deleted のときは $null
-        }
-        の配列を、before/after の並び順で返します。
+        ConvertTo-DiffText と ConvertTo-DiffHtml は、この型のものだけを受け付けます。
     .EXAMPLE
         PS> $rows = Get-DiffAlignment -BeforeLines @('id bigint,', 'name varchar(100),') -AfterLines @('id bigint,', 'name varchar(20),')
         PS> $rows | ForEach-Object -Process { $_.Kind }
@@ -66,7 +64,7 @@ function Get-DiffAlignment {
         2 行目は同じ行の書き換えとして、1 つの Changed にまとまります。
     #>
     [CmdletBinding()]
-    [OutputType([hashtable[]])]
+    [OutputType('TextDiff.DiffRow')]
     param(
         # NOTE: AllowEmptyString が必須（理由は ConvertTo-LineId のコメント参照）
         [Parameter(Mandatory)] [AllowEmptyCollection()] [AllowEmptyString()] [string[]]$BeforeLines,
@@ -82,18 +80,19 @@ function Get-DiffAlignment {
     #       どちらも空、つまり対象オブジェクトが存在しない場合に実際に起きる）
     $ops = @(Get-MyersOperation -Left $ids.Left -Right $ids.Right)
 
-    $result = [System.Collections.Generic.List[hashtable]]::new()
+    $result = [System.Collections.Generic.List[object]]::new()
     $index = 0
     while ($index -lt $ops.Count) {
         $op = $ops[$index]
 
         if ($op.Kind -ceq 'Same') {
-            $result.Add(@{
-                    Kind    = 'Same'
-                    LeftNo  = $op.LeftIndex + 1
-                    RightNo = $op.RightIndex + 1
-                    Left    = $BeforeLines[$op.LeftIndex]
-                    Right   = $AfterLines[$op.RightIndex]
+            $result.Add([PSCustomObject]@{
+                    PSTypeName = 'TextDiff.DiffRow'
+                    Kind       = 'Same'
+                    LeftNo     = $op.LeftIndex + 1
+                    RightNo    = $op.RightIndex + 1
+                    Left       = $BeforeLines[$op.LeftIndex]
+                    Right      = $AfterLines[$op.RightIndex]
                 })
             $index++
             continue
@@ -160,9 +159,16 @@ function Get-DiffAlignment {
                 })
         }
 
+        # 並べ替えに使った Order は、返す行に含めない
         foreach ($entry in ($pending | Sort-Object -CaseSensitive -Property { $_.Order })) {
-            $entry.Remove('Order')
-            $result.Add($entry)
+            $result.Add([PSCustomObject]@{
+                    PSTypeName = 'TextDiff.DiffRow'
+                    Kind       = $entry.Kind
+                    LeftNo     = $entry.LeftNo
+                    RightNo    = $entry.RightNo
+                    Left       = $entry.Left
+                    Right      = $entry.Right
+                })
         }
     }
 

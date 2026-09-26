@@ -32,7 +32,8 @@ function ConvertTo-DiffHtml {
         文書の題名。<title> と先頭の見出しに使います。HTML としてエスケープしてから埋め込みます。
     .PARAMETER Sections
         @{ Label = 'テーブル定義'; Rows = <Get-DiffAlignment の戻り値>; Unverified = @('...') }
-        の配列。Unverified が指定されたセクションは、差分の代わりにその内容を表示します。
+        の配列。Rows には Get-DiffAlignment の戻り値（TextDiff.DiffRow）だけを渡せます。
+        Unverified が指定されたセクションは、差分の代わりにその内容を表示します。
         before か after の取得に失敗して比較できないセクションに使います。
         「差分なし」と見分けが付かない表示にしないためです。
     .OUTPUTS
@@ -50,8 +51,18 @@ function ConvertTo-DiffHtml {
     [OutputType([string])]
     param(
         [Parameter(Mandatory)] [ValidateNotNullOrEmpty()] [string]$Title,
-        [Parameter(Mandatory)] [AllowEmptyCollection()] [array]$Sections
+        [Parameter(Mandatory)] [AllowEmptyCollection()] [hashtable[]]$Sections
     )
+
+    # Rows の型は、描き始める前にすべてのセクションで確かめる。差分の無いセクションは
+    # 行を描かないため、描くときの型の検査だけでは素通りする
+    foreach ($section in $Sections) {
+        if (-not $section.ContainsKey('Rows')) { continue }
+        $foreignRows = @(@($section.Rows) | Where-Object -FilterScript { $_.PSObject.TypeNames -inotcontains 'TextDiff.DiffRow' })
+        if ($foreignRows.Count -gt 0) {
+            throw [System.ArgumentException]::new(("Sections の Rows には Get-DiffAlignment の戻り値を渡してください（セクション: {0}）" -f $section['Label']), 'Sections')
+        }
+    }
 
     $escapedTitle = ConvertTo-HtmlText -Text $Title
     $builder = [System.Text.StringBuilder]::new()

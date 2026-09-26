@@ -7,8 +7,7 @@
         空の行を置き、斜線で「対応する行が無い」ことを示します。
         行数を揃えないと、行が上下にずれて左右の比較が成立しません。
     .PARAMETER Rows
-        Get-DiffAlignment が返す行の対応づけ。Kind / LeftNo / RightNo / Left / Right を持つ
-        ハッシュテーブルの配列です。
+        Get-DiffAlignment が返す行の対応づけ（TextDiff.DiffRow の配列）。それ以外は受け付けません。
     .PARAMETER Side
         組み立てる側。'left' なら before、'right' なら after の行を並べます。
     .OUTPUTS
@@ -17,7 +16,7 @@
     [CmdletBinding()]
     [OutputType([string])]
     param(
-        [Parameter(Mandatory)] [AllowEmptyCollection()] [array]$Rows,
+        [Parameter(Mandatory)] [AllowEmptyCollection()] [PSTypeName('TextDiff.DiffRow')] [psobject[]]$Rows,
         [Parameter(Mandatory)] [ValidateSet('left', 'right', IgnoreCase = $false)] [string]$Side
     )
 

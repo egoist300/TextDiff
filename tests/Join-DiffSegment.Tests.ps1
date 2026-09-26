@@ -43,6 +43,19 @@ Describe "Join-DiffSegment" {
             @(Join-DiffSegment -Segments @(@{ Text = ''; Changed = $false })).Count | Should -BeExactly 0
         }
     }
+
+    It "断片は型名 TextDiff.Segment の PSCustomObject で返す" {
+        InModuleScope TextDiff {
+            # この断片は ConvertTo-DiffText の戻り値として利用者に渡る
+            $merged = @(Join-DiffSegment -Segments @(@{ Text = 'a'; Changed = $false }, @{ Text = 'b'; Changed = $true }))
+
+            foreach ($segment in $merged) {
+                $segment -is [System.Management.Automation.PSCustomObject] | Should -BeTrue
+                $segment.PSObject.TypeNames[0] | Should -BeExactly 'TextDiff.Segment'
+                (@($segment.PSObject.Properties | ForEach-Object -Process { $_.Name }) -join ',') | Should -BeExactly 'Text,Changed'
+            }
+        }
+    }
 }
 
 AfterAll {

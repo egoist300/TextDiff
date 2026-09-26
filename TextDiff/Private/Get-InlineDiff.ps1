@@ -47,10 +47,11 @@ function Get-InlineDiff {
         中央を細かく比べるトークン数の上限。どちらかの側が超えたら、中央をまとめて変更扱いにします。
     .OUTPUTS
         [hashtable] @{
-            Left  = @( @{ Text = '...'; Changed = $false }, ... )
-            Right = @( ... )
+            Left  = @( TextDiff.Segment, ... )
+            Right = @( TextDiff.Segment, ... )
         }
-        断片の Text を順に連結すると、入力の行に一致します。
+        断片（Join-DiffSegment が作る [PSCustomObject]@{ Text; Changed }）の Text を順に連結すると、
+        入力の行に一致します。外側の組は内部で受け渡すだけなので、ハッシュテーブルのままにしています。
     .EXAMPLE
         Get-InlineDiff -Left '  name varying(100),' -Right '  name varying(20),'
         # Left  : '  name varying(' / '100'(変更) / '),'

@@ -73,11 +73,16 @@ $html = ConvertTo-DiffHtml -Title 'settings' -Sections @(@{ Label = 'アプリ�
 
 ## 戻り値の形
 
-| 関数 | 1 要素の形 |
-| :--- | :--- |
-| `Get-DiffAlignment` | `@{ Kind = 'Same' \| 'Changed' \| 'Deleted' \| 'Added'; LeftNo; RightNo; Left; Right }`。行番号は 1 始まりで、片側にしか無い行の反対側は `$null` |
-| `ConvertTo-DiffText` | `@{ Gutter; Role = 'Removed' \| 'Added' \| 'Context' \| 'Omitted'; Segments = @(@{ Text; Changed }) }`。`Omitted` の行は `Segments` が空で、畳んだ行数を `OmittedCount` に持つ |
-| `ConvertTo-DiffHtml` | HTML 文書全体の文字列 |
+どれも型名の付いた `[PSCustomObject]` で返します。
+
+| 関数 | 型名 | 項目 |
+| :--- | :--- | :--- |
+| `Get-DiffAlignment` | `TextDiff.DiffRow` | `Kind`（`Same` / `Changed` / `Deleted` / `Added`）、`LeftNo`、`RightNo`、`Left`、`Right`。行番号は 1 始まりで、片側にしか無い行の反対側は `$null` |
+| `ConvertTo-DiffText` | `TextDiff.TextLine` | `Gutter`、`Role`（`Removed` / `Added` / `Context` / `Omitted`）、`Segments`、`OmittedCount`。`Omitted` の行は `Segments` が空で、畳んだ行数を `OmittedCount` に持つ。ほかの行の `OmittedCount` は 0 |
+| （`Segments` の要素） | `TextDiff.Segment` | `Text`、`Changed`（行内で変わった部分なら `$true`） |
+| `ConvertTo-DiffHtml` | （文字列） | HTML 文書全体 |
+
+`ConvertTo-DiffText` の `-Rows` と、`ConvertTo-DiffHtml` のセクションの `Rows` には、`Get-DiffAlignment` の戻り値だけを渡せます。
 
 詳しくは `Get-Help Get-DiffAlignment -Full` などで読めます。
 

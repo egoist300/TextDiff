@@ -230,6 +230,18 @@ Describe "ConvertTo-DiffHtml" {
             }
         }
     }
+
+    Context "受け付ける入力" {
+
+        It "Rows に Get-DiffAlignment の結果ではないものを渡すと失敗する" {
+            InModuleScope TextDiff {
+                # 差分の無い行（Same）だけだと行を描かないので、描くときの型の検査は通らない。入口で弾くことを確かめる
+                $section = @{ Label = 'L'; Rows = @(@{ Kind = 'Same'; LeftNo = 1; RightNo = 1; Left = 'a'; Right = 'a' }) }
+
+                { ConvertTo-DiffHtml -Title 'T' -Sections @($section) } | Should -Throw -ExceptionType ([System.ArgumentException])
+            }
+        }
+    }
 }
 
 AfterAll {

@@ -26,19 +26,16 @@ function ConvertTo-DiffText {
 
         変更のある行の前後 ContextLine 行だけを残し、それ以外は 1 行の省略表示に畳みます。
     .PARAMETER Rows
-        Get-DiffAlignment が返す行の対応づけ。Kind / LeftNo / RightNo / Left / Right を持つ
-        ハッシュテーブルの配列です。
+        Get-DiffAlignment が返す行の対応づけ（TextDiff.DiffRow の配列）。それ以外は受け付けません。
     .PARAMETER ContextLine
         変更のある行の前後に残す、変わっていない行の数（0〜100）。
     .OUTPUTS
-        [hashtable[]] 次の形の配列。
-        @{
-            Gutter   = '   6- '  行番号とマーカー
-            Role     = 'Removed' | 'Added' | 'Context' | 'Omitted'
-            Segments = @( @{ Text = '...'; Changed = $false }, ... )
-        }
-        Segments の Text を連結すると、元の行に一致します。
-        Omitted の行だけは Segments が空で、畳んだ行数を OmittedCount に持ちます。
+        TextDiff.TextLine。次の項目を持つ [PSCustomObject] の配列です。
+            Gutter       = '   6- '  行番号とマーカー
+            Role         = 'Removed' | 'Added' | 'Context' | 'Omitted'
+            Segments     = TextDiff.Segment（[PSCustomObject]@{ Text; Changed }）の配列
+            OmittedCount = 畳んだ行数。Omitted 以外の行では 0
+        Segments の Text を連結すると、元の行に一致します。Omitted の行だけは Segments が空です。
     .EXAMPLE
         PS> $rows = Get-DiffAlignment -BeforeLines @('name varchar(100),') -AfterLines @('name varchar(20),')
         PS> foreach ($line in ConvertTo-DiffText -Rows $rows) {
@@ -53,13 +50,13 @@ function ConvertTo-DiffText {
         削除側と追加側の 2 行を出し、行内で変わった部分（100 と 20）だけを黄色にします。
     #>
     [CmdletBinding()]
-    [OutputType([hashtable[]])]
+    [OutputType('TextDiff.TextLine')]
     param(
-        [Parameter(Mandatory)] [AllowEmptyCollection()] [array]$Rows,
+        [Parameter(Mandatory)] [AllowEmptyCollection()] [PSTypeName('TextDiff.DiffRow')] [psobject[]]$Rows,
         [ValidateRange(0, 100)] [int]$ContextLine = 3
     )
 
-    $output = [System.Collections.Generic.List[hashtable]]::new()
+    $output = [System.Collections.Generic.List[object]]::new()
     if ($Rows.Count -eq 0) { return $output.ToArray() }
 
     # --- 表示する行を決める ---
@@ -98,58 +95,69 @@ function ConvertTo-DiffText {
         return "  $text$Marker "
     }
 
+    function ConvertTo-TextLine {
+        <#
+        .SYNOPSIS
+            返す 1 行（TextDiff.TextLine）を作る。どの行も同じ項目を持たせるため、ここでだけ作る。
+        .PARAMETER Gutter
+            行番号とマーカーの見出し。
+        .PARAMETER Role
+            'Removed' / 'Added' / 'Context' / 'Omitted' のいずれか。
+        .PARAMETER Text
+            行全体を 1 つの変わっていない断片にするときの本文。Segments を渡すときは使わない。
+        .PARAMETER Segments
+            行内の差分で分けた断片（TextDiff.Segment の配列）。
+        .PARAMETER OmittedCount
+            畳んだ行数。Omitted 以外の行では 0。
+        #>
+        param(
+            [string]$Gutter,
+            [string]$Role,
+            [string]$Text,
+            [psobject[]]$Segments = @(),
+            [int]$OmittedCount = 0
+        )
+        $lineSegments = if ($PSBoundParameters.ContainsKey('Text')) {
+            [PSCustomObject]@{ PSTypeName = 'TextDiff.Segment'; Text = $Text; Changed = $false }
+        }
+        else {
+            $Segments
+        }
+        return [PSCustomObject]@{
+            PSTypeName   = 'TextDiff.TextLine'
+            Gutter       = $Gutter
+            Role         = $Role
+            Segments     = @($lineSegments)
+            OmittedCount = $OmittedCount
+        }
+    }
+
     $index = 0
     while ($index -lt $Rows.Count) {
         if (-not $keep[$index]) {
             # 連続する非表示行をまとめて 1 行に畳む
             $start = $index
             while ($index -lt $Rows.Count -and -not $keep[$index]) { $index++ }
-            $omitted = $index - $start
-            $output.Add(@{
-                    Gutter       = ('  ' + ('.' * $noWidth) + '  ')
-                    Role         = 'Omitted'
-                    OmittedCount = $omitted
-                    Segments     = @()
-                })
+            $output.Add((ConvertTo-TextLine -Gutter ('  ' + ('.' * $noWidth) + '  ') -Role 'Omitted' -OmittedCount ($index - $start)))
             continue
         }
 
         $row = $Rows[$index]
         switch -CaseSensitive ($row.Kind) {
             'Same' {
-                $output.Add(@{
-                        Gutter   = (Format-Gutter -Number $row.RightNo -Marker ' ' -Width $noWidth)
-                        Role     = 'Context'
-                        Segments = @(@{ Text = $row.Right; Changed = $false })
-                    })
+                $output.Add((ConvertTo-TextLine -Gutter (Format-Gutter -Number $row.RightNo -Marker ' ' -Width $noWidth) -Role 'Context' -Text $row.Right))
             }
             'Changed' {
                 # 行内のどこが変わったかを求め、削除側と追加側の 2 行に分けて出す
                 $inline = Get-InlineDiff -Left $row.Left -Right $row.Right
-                $output.Add(@{
-                        Gutter   = (Format-Gutter -Number $row.LeftNo -Marker '-' -Width $noWidth)
-                        Role     = 'Removed'
-                        Segments = @($inline.Left)
-                    })
-                $output.Add(@{
-                        Gutter   = (Format-Gutter -Number $row.RightNo -Marker '+' -Width $noWidth)
-                        Role     = 'Added'
-                        Segments = @($inline.Right)
-                    })
+                $output.Add((ConvertTo-TextLine -Gutter (Format-Gutter -Number $row.LeftNo -Marker '-' -Width $noWidth) -Role 'Removed' -Segments $inline.Left))
+                $output.Add((ConvertTo-TextLine -Gutter (Format-Gutter -Number $row.RightNo -Marker '+' -Width $noWidth) -Role 'Added' -Segments $inline.Right))
             }
             'Deleted' {
-                $output.Add(@{
-                        Gutter   = (Format-Gutter -Number $row.LeftNo -Marker '-' -Width $noWidth)
-                        Role     = 'Removed'
-                        Segments = @(@{ Text = $row.Left; Changed = $false })
-                    })
+                $output.Add((ConvertTo-TextLine -Gutter (Format-Gutter -Number $row.LeftNo -Marker '-' -Width $noWidth) -Role 'Removed' -Text $row.Left))
             }
             'Added' {
-                $output.Add(@{
-                        Gutter   = (Format-Gutter -Number $row.RightNo -Marker '+' -Width $noWidth)
-                        Role     = 'Added'
-                        Segments = @(@{ Text = $row.Right; Changed = $false })
-                    })
+                $output.Add((ConvertTo-TextLine -Gutter (Format-Gutter -Number $row.RightNo -Marker '+' -Width $noWidth) -Role 'Added' -Text $row.Right))
             }
         }
         $index++

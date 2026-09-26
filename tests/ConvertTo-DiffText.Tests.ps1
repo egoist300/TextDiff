@@ -206,6 +206,44 @@ Describe "ConvertTo-DiffText" {
             }
         }
     }
+
+    Context "戻り値の型" {
+
+        It "行は TextDiff.TextLine、断片は TextDiff.Segment の PSCustomObject で返す" {
+            InModuleScope TextDiff {
+                $lines = @(ConvertTo-DiffText -Rows (New-TestRow -Count 30 -ChangeAt @(3)) -ContextLine 3)
+
+                foreach ($line in $lines) {
+                    $line -is [System.Management.Automation.PSCustomObject] | Should -BeTrue
+                    $line.PSObject.TypeNames[0] | Should -BeExactly 'TextDiff.TextLine'
+                    foreach ($segment in @($line.Segments)) {
+                        $segment -is [System.Management.Automation.PSCustomObject] | Should -BeTrue
+                        $segment.PSObject.TypeNames[0] | Should -BeExactly 'TextDiff.Segment'
+                    }
+                }
+            }
+        }
+
+        It "すべての行が同じ項目を持ち、畳んだ行以外の OmittedCount は 0" {
+            InModuleScope TextDiff {
+                # 行ごとに項目が違うと、Format-Table の列が最初の行に引きずられ、
+                # StrictMode では無い項目を読んだ時点で例外になる
+                $lines = @(ConvertTo-DiffText -Rows (New-TestRow -Count 30 -ChangeAt @(3)) -ContextLine 3)
+
+                foreach ($line in $lines) {
+                    (@($line.PSObject.Properties | ForEach-Object -Process { $_.Name }) -join ',') | Should -BeExactly 'Gutter,Role,Segments,OmittedCount'
+                    if ($line.Role -cne 'Omitted') { $line.OmittedCount | Should -BeExactly 0 }
+                }
+            }
+        }
+
+        It "Get-DiffAlignment の結果ではないものは Rows に受け付けない" {
+            InModuleScope TextDiff {
+                # 形の違うものを受け取ると、途中で「項目が無い」と分かりにくい失敗をする
+                { ConvertTo-DiffText -Rows @(@{ Kind = 'Same'; LeftNo = 1; RightNo = 1; Left = 'a'; Right = 'a' }) } | Should -Throw
+            }
+        }
+    }
 }
 
 AfterAll {
