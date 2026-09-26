@@ -1,0 +1,65 @@
+name: Publish
+
+# v1.2.3 の形のタグを push すると、テストを通したうえで PowerShell Gallery へ公開する。
+# 一度公開した版は上書きも削除もできない（一覧から隠すことだけができる）。
+#
+# 必要なもの: リポジトリの Secrets に PSGALLERY_API_KEY（PowerShell Gallery の API キー。
+# 対象のパッケージを TextDiff に絞り、公開（Push）の権限だけを与える）。
+#
+# run: の中に日本語を書かないこと（理由は ci.yml の冒頭）。
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Ensure Pester
+        shell: powershell
+        run: |
+          $want = [version]'5.9.0'
+          if (-not (Get-Module -ListAvailable -Name Pester | Where-Object -FilterScript { $_.Version -eq $want })) {
+              Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+              Install-Module -Name Pester -Scope CurrentUser -Force -SkipPublisherCheck -RequiredVersion $want
+          }
+
+      - name: Pester
+        shell: powershell
+        run: |
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          Import-Module -Name Pester -RequiredVersion 5.9.0 -Force
+          $result = Invoke-Pester -Path .\tests -Output Detailed -PassThru
+          if ($result.FailedCount -gt 0) { throw "$($result.FailedCount) test(s) failed" }
+
+  publish:
+    needs: test
+    runs-on: windows-latest
+    # 公開は Secrets を使うので、承認を挟みたくなったら environment を足す
+    steps:
+      - uses: actions/checkout@v7
+
+      # タグとマニフェストの版が違うまま公開すると、公開された版から元のコミットを辿れなくなる
+      - name: Check tag matches ModuleVersion
+        shell: powershell
+        run: |
+          $version = (Import-PowerShellDataFile -Path .\TextDiff\TextDiff.psd1).ModuleVersion
+          if ('v' + $version -cne $env:GITHUB_REF_NAME) { throw "Tag $env:GITHUB_REF_NAME does not match ModuleVersion $version" }
+
+      - name: Ensure PSResourceGet
+        shell: powershell
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Microsoft.PowerShell.PSResourceGet -Scope CurrentUser -Force -RequiredVersion 1.2.0
+
+      - name: Publish to PowerShell Gallery
+        shell: powershell
+        env:
+          PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+        run: |
+          if ([string]::IsNullOrEmpty($env:PSGALLERY_API_KEY)) { throw 'PSGALLERY_API_KEY is not set' }
+          Import-Module -Name Microsoft.PowerShell.PSResourceGet -RequiredVersion 1.2.0 -Force
+          Publish-PSResource -Path .\TextDiff -Repository PSGallery -ApiKey $env:PSGALLERY_API_KEY

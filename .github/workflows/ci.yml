@@ -1,0 +1,101 @@
+name: CI
+
+# Pester と PSScriptAnalyzer を、利用者と同じ Windows PowerShell 5.1 で回す。
+# shell: powershell が Windows PowerShell 5.1、pwsh は PowerShell 7 になる。
+#
+# 【run: の中に日本語を書かないこと】
+# GitHub Actions は run: の中身を BOM なしの一時 .ps1 に書き出し、Windows PowerShell 5.1 は
+# それを ANSI コードページとして読む。文字列リテラルに日本語を入れると構文エラーになりうる。
+# 説明はこの YAML コメント側に書く。
+#
+# 使うモジュールの版は README.md の「開発」の表が正。各ジョブは自分が使うものだけを
+# -RequiredVersion で 1 点に固定する。範囲で指定すると、runner に同居している別の版が選ばれる。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # runner の shell: powershell の実体が変わったときに気づくため
+      - name: Check PowerShell version
+        shell: powershell
+        run: |
+          if ($PSVersionTable.PSVersion.Major -ne 5) { throw "Expected Windows PowerShell 5.1 but got $($PSVersionTable.PSVersion)" }
+
+      # windows-latest に同梱されている版なら何もしない。版がずれたらインストールが走り、ログに出る。
+      # Windows 同梱の Pester 3.4.0 と署名者が異なるため -SkipPublisherCheck が要る
+      - name: Ensure Pester
+        shell: powershell
+        run: |
+          $want = [version]'5.9.0'
+          if (-not (Get-Module -ListAvailable -Name Pester | Where-Object -FilterScript { $_.Version -eq $want })) {
+              Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+              Install-Module -Name Pester -Scope CurrentUser -Force -SkipPublisherCheck -RequiredVersion $want
+          }
+
+      - name: Pester
+        shell: powershell
+        run: |
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          Import-Module -Name Pester -RequiredVersion 5.9.0 -Force
+          $result = Invoke-Pester -Path .\tests -Output Detailed -PassThru
+          if ($result.FailedCount -gt 0) { throw "$($result.FailedCount) test(s) failed" }
+
+  lint:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Ensure PSScriptAnalyzer
+        shell: powershell
+        run: |
+          $want = [version]'1.25.0'
+          if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer | Where-Object -FilterScript { $_.Version -eq $want })) {
+              Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+              Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -RequiredVersion $want
+          }
+
+      # 設定ファイルの Severity に ParseError を含めてあるため、構文エラーのあるファイルもここで落ちる
+      - name: PSScriptAnalyzer
+        shell: powershell
+        run: |
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          Import-Module -Name PSScriptAnalyzer -RequiredVersion 1.25.0 -Force
+          $findings = @(Invoke-ScriptAnalyzer -Path . -Recurse -Settings .\PSScriptAnalyzerSettings.psd1)
+          if ($findings.Count -gt 0) {
+              $findings | Format-Table -Property RuleName, Severity, ScriptName, Line, Message -AutoSize | Out-String -Width 200 | Write-Host
+              throw "$($findings.Count) finding(s) from PSScriptAnalyzer"
+          }
+
+  # 公開と同じ手順で、runner の中のフォルダへ公開してみる。
+  # PowerShell Gallery へ公開するときに初めてマニフェストやパッケージの不備に気づくのを防ぐ。
+  # 手順は publish.yml と同じにしておくこと
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Ensure PSResourceGet
+        shell: powershell
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Microsoft.PowerShell.PSResourceGet -Scope CurrentUser -Force -RequiredVersion 1.2.0
+
+      - name: Publish to a local repository
+        shell: powershell
+        run: |
+          Import-Module -Name Microsoft.PowerShell.PSResourceGet -RequiredVersion 1.2.0 -Force
+          $localRepository = Join-Path -Path $env:RUNNER_TEMP -ChildPath 'local-repository'
+          New-Item -ItemType Directory -Path $localRepository -Force | Out-Null
+          Register-PSResourceRepository -Name LocalCheck -Uri $localRepository -Trusted
+          Publish-PSResource -Path .\TextDiff -Repository LocalCheck
+          $package = @(Get-ChildItem -LiteralPath $localRepository -Filter 'TextDiff.*.nupkg')
+          if ($package.Count -ne 1) { throw "Expected one TextDiff package but found $($package.Count)" }
+          Write-Host "Packaged: $($package[0].Name)"
