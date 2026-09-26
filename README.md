@@ -98,10 +98,11 @@ Invoke-ScriptAnalyzer -Path . -Recurse -Settings .\PSScriptAnalyzerSettings.psd1
 | モジュール | 版 | 用途 |
 | :--- | :--- | :--- |
 | Pester | 5.9.0 | テスト |
-| PSScriptAnalyzer | 1.25.0 | 静的解析 |
+| PSScriptAnalyzer | 1.25.0 | 静的解析。カスタムルールのテスト（`tests/CodingRules.Tests.ps1`）でも使う |
 | Microsoft.PowerShell.PSResourceGet | 1.2.0 | 公開（CI だけで使う） |
 
-書き方の決まりは [`CLAUDE.md`](CLAUDE.md) にあります。
+静的解析は、既定のルールに加えて、書き方の決まり（引数を名前で渡す、比較演算子で大小文字の扱いを明示する、など）を
+`tools/PSScriptAnalyzerRules/CodingRules.psm1` のカスタムルールで検査します。決まりの一覧は [`CLAUDE.md`](CLAUDE.md) にあります。
 
 ## 公開の手順
 

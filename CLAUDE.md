@@ -30,12 +30,16 @@ Every function, including test helpers and functions defined inside functions, h
 documents every parameter. Public functions also have at least one `.EXAMPLE`.
 `tests/CommentBasedHelp.Tests.ps1` enforces both.
 
-## Case in string comparisons
+## Lint
 
-State the rule at every comparison: `-ceq` / `-cne` / `-cmatch` for data, `-i` operators for
-PowerShell's own names, `switch -CaseSensitive`, `Sort-Object -CaseSensitive`, and a
-`StringComparison` for `StartsWith` / `EndsWith` / `IndexOf`. In tests use `Should -BeExactly` /
-`-MatchExactly`.
+`~/.claude/rules/powershell.md` applies. `tools/PSScriptAnalyzerRules/CodingRules.psm1` checks the
+parts that can be read from the syntax tree: no backtick continuation, no single-letter variables,
+no `[bool]` parameters, named arguments, parenthesized `-f` in method arguments, no `Start-Process`,
+the `#Requires` and help header of standalone scripts, `-c` / `-i` on comparison operators, and
+case-sensitive `Should` assertions (`-BeExactly`, `-MatchExactly`; `-ccontains` with `-BeTrue`
+instead of `-Contain`; `-ExceptionType` instead of a `-Throw` message). `tests/CodingRules.Tests.ps1`
+checks that each rule finds violations. Run the analyzer from the repository root: the rule path is
+relative.
 
 ## File encoding
 

@@ -16,6 +16,13 @@
     # [OutputType([hashtable[]])] と宣言しても残る。宣言してある型が契約として正しい
     Severity = @('ParseError', 'Error', 'Warning')
 
+    # 書き方の決まり（~/.claude/rules/powershell.md）のカスタムルール。
+    # 相対パスは、この設定ファイルの場所ではなく、実行するときのカレントフォルダから解決される。
+    # CI も手元の手順も VS Code も、リポジトリの直下で動くので、そこからのパスで書く
+    CustomRulePath      = @('tools\PSScriptAnalyzerRules\CodingRules.psm1')
+    # CustomRulePath を書くと、これが無い限り既定のルールが黙って止まる
+    IncludeDefaultRules = $true
+
     Rules = @{
         PSUseSingularNouns = @{
             Enable = $true

@@ -21,11 +21,11 @@ BeforeAll {
     function Get-RepositoryScriptFile {
         <#
         .SYNOPSIS
-            リポジトリの中の .ps1 をすべて返す（.git の中を除く）。
+            リポジトリの中の .ps1 と .psm1 をすべて返す（.git の中を除く）。
         #>
         $gitDir = (Join-Path -Path $script:repoRoot -ChildPath '.git') + [System.IO.Path]::DirectorySeparatorChar
-        Get-ChildItem -LiteralPath $script:repoRoot -Filter *.ps1 -File -Recurse -Force -ErrorAction Stop |
-            Where-Object -FilterScript { $_.Extension -ieq '.ps1' -and -not $_.FullName.StartsWith($gitDir, [System.StringComparison]::OrdinalIgnoreCase) }
+        Get-ChildItem -LiteralPath $script:repoRoot -File -Recurse -Force -ErrorAction Stop |
+            Where-Object -FilterScript { @('.ps1', '.psm1') -icontains $_.Extension -and -not $_.FullName.StartsWith($gitDir, [System.StringComparison]::OrdinalIgnoreCase) }
     }
 
     function Get-FileAst {

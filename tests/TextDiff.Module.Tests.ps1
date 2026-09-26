@@ -157,7 +157,7 @@ Import-Module -Name '$script:manifestPath' -Force
         It "すべてのテストファイルに、対応する関数か全体の検査がある" {
             # 関数を消したのにテストだけ残ると、何を守っているのか分からないテストになる
             $sourceNames = @(Get-SourceFile | ForEach-Object -MemberName BaseName)
-            $wholeRepo = @('TextDiff.Module', 'FileEncoding', 'CommentBasedHelp')
+            $wholeRepo = @('TextDiff.Module', 'FileEncoding', 'CommentBasedHelp', 'CodingRules')
             $orphans = @(Get-ChildItem -LiteralPath $script:testsRoot -Filter *.Tests.ps1 -File |
                     ForEach-Object -Process { $_.Name -creplace '\.Tests\.ps1$', '' } |
                     Where-Object -FilterScript { $sourceNames -cnotcontains $_ -and $wholeRepo -cnotcontains $_ })
