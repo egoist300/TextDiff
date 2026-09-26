@@ -3,7 +3,7 @@
 function Format-DiffGutter {
     <#
     .SYNOPSIS
-        行番号とマーカーから、桁数を揃えた見出しを作成する。
+        行番号とマーカーから、桁数を統一した見出しを作成する。
     .PARAMETER Number
         行番号。反対側にしか無い行では省略し、その桁を空白で埋めます。
     .PARAMETER Marker

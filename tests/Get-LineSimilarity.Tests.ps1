@@ -33,7 +33,7 @@ Describe "Get-LineSimilarity" {
         }
     }
 
-    It "別の列に置き換わった行は低い値になる" {
+    It "別の列に置換された行は低い値になる" {
         InModuleScope TextDiff {
             # 対応付けてはいけない変更の代表例。
             $similarity = Get-LineSimilarity -Left '    status_code character(2) NOT NULL,' -Right '    contact_email_address text,'

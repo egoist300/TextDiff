@@ -3,7 +3,7 @@
 # tools/PSScriptAnalyzerRules/CodingRules.psm1（書き方の決まりのカスタムルール）のテスト。
 #
 # 決まりそのものの検査は PSScriptAnalyzer が行う（CI の lint ジョブと、VS Code の PowerShell 拡張）。
-# ここでは、各ルールが違反を検出し、決まりを守った書き方は検出しないことを確認する。
+# ここでは、各ルールが違反を検出し、規約に従った書き方は検出しないことを確認する。
 # ルールが壊れて何も検出しなくなると、リポジトリ全体の検査が無条件に成功するため。
 #
 # 各ルールに、違反の行と決まりを守った行を並べた短いスクリプトを渡し、指摘された行番号を比較する。
@@ -116,7 +116,7 @@ Describe "カスタムルール" {
     }
 
     It "StandaloneScriptHeader: #Requires とヘルプの無いスクリプトを検出する" {
-        # param() が 3 行目にあるため、#Requires とヘルプが無いという指摘は 3 行目に出る。
+        # param() が 3 行目にあるため、#Requires とヘルプが無いという指摘は 3 行目に報告される。
         Get-FindingLine -Rule StandaloneScriptHeader -Line @(
             '# 説明だけ'
             ''
@@ -124,7 +124,7 @@ Describe "カスタムルール" {
         ) | Should -BeExactly @(3, 3)
     }
 
-    It "StandaloneScriptHeader: 決まりどおりのスクリプトは検出しない" {
+    It "StandaloneScriptHeader: 規約に従ったスクリプトは検出しない" {
         Get-FindingLine -Rule StandaloneScriptHeader -Line @(
             '#Requires -Version 5.1'
             ''

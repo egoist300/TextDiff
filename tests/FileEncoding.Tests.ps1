@@ -108,7 +108,7 @@ Describe "ファイルの文字コード規約" {
 
     It "改行は LF に統一されている" {
         # .gitattributes で `* -text` を指定しており、git は改行を一切変換しない。
-        # 書いた側が CRLF を混在させるとそのまま記録され、見た目も動作も変わらないため、目視では検出できない。
+        # 書いた側が CRLF を混在させるとそのまま記録され、見た目も動作も変化しないため、目視では検出できない。
         $extensions = $script:bomExtensions + $script:noBomExtensions
         $violations = @(
             Get-TargetFile -Extension $extensions | ForEach-Object -Process {

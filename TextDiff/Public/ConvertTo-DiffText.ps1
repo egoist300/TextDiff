@@ -10,7 +10,7 @@ function ConvertTo-DiffText {
 
         変更行の前後 ContextLine 行だけを残し、それ以外は 1 行の省略行にまとめます。
 
-        コンソールへの出力はしません。表示の色と、省略行の文言（「N 行省略」など）は呼び出し側で決めます。
+        コンソールへの出力はしません。表示の色と、省略行の文言（「N 行省略」など）は呼び出し側で指定します。
     .PARAMETER Rows
         Get-DiffAlignment が返す行の対応付け（TextDiff.DiffRow の配列）。それ以外は受け付けません。
     .PARAMETER ContextLine
@@ -45,10 +45,10 @@ function ConvertTo-DiffText {
     $output = [System.Collections.Generic.List[object]]::new()
     if ($Rows.Count -eq 0) { return $output.ToArray() }
 
-    # --- 表示する行を決める ---
+    # --- 表示する行を判定する ---
     # 変更行から ContextLine 行以内の行だけを残す。1000 行のうち 5 行の変更で 995 行の文脈を表示すると、
     # 差分が読みにくくなるため（git diff と同じ方式）。
-    # ConvertTo-DiffHtml は証跡として全体を残すため、行を省略しない。
+    # ConvertTo-DiffHtml は保存して後から読むため、行を省略しない。
     $keep = New-Object -TypeName 'bool[]' -ArgumentList $Rows.Count
     for ($rowIndex = 0; $rowIndex -lt $Rows.Count; $rowIndex++) {
         if ($Rows[$rowIndex].Kind -ceq 'Same') { continue }
@@ -57,8 +57,8 @@ function ConvertTo-DiffText {
         for ($keepIndex = $from; $keepIndex -le $to; $keepIndex++) { $keep[$keepIndex] = $true }
     }
 
-    # --- 行番号の桁数を揃える ---
-    # 途中で桁数が変わると行の位置がずれ、差分より目立つため。
+    # --- 行番号の桁数を統一する ---
+    # 途中で桁数が変化すると行の位置がずれ、差分より目立つため。
     $maxNo = 0
     foreach ($row in $Rows) {
         foreach ($no in @($row.LeftNo, $row.RightNo)) {
@@ -83,7 +83,7 @@ function ConvertTo-DiffText {
                 $output.Add((ConvertTo-DiffTextLine -Gutter (Format-DiffGutter -Number $row.RightNo -Marker ' ' -Width $noWidth) -Role 'Context' -Text $row.Right))
             }
             'Changed' {
-                # 行内の変更箇所を求め、削除行と追加行の 2 行として出力する。
+                # 行内の変更箇所を検出し、削除行と追加行の 2 行として出力する。
                 $inline = Get-InlineDiff -Left $row.Left -Right $row.Right
                 $output.Add((ConvertTo-DiffTextLine -Gutter (Format-DiffGutter -Number $row.LeftNo -Marker '-' -Width $noWidth) -Role 'Removed' -Segments $inline.Left))
                 $output.Add((ConvertTo-DiffTextLine -Gutter (Format-DiffGutter -Number $row.RightNo -Marker '+' -Width $noWidth) -Role 'Added' -Segments $inline.Right))

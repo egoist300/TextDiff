@@ -149,7 +149,7 @@ Describe "ConvertTo-DiffText" {
             }
         }
 
-        It "見出しに行番号とマーカーが入る" {
+        It "見出しに行番号とマーカーが含まれる" {
             InModuleScope TextDiff {
                 $rows = @(Get-DiffAlignment -BeforeLines @('a', 'b') -AfterLines @('a', 'c'))
                 $lines = @(ConvertTo-DiffText -Rows $rows)
@@ -161,9 +161,9 @@ Describe "ConvertTo-DiffText" {
             }
         }
 
-        It "行番号の桁数を揃える" {
+        It "行番号の桁数を統一する" {
             InModuleScope TextDiff {
-                # 途中で桁数が変わると行の位置がずれ、差分より目立つため。
+                # 途中で桁数が変化すると行の位置がずれ、差分より目立つため。
                 $rows = @(New-TestRow -Count 120 -ChangeAt @(5, 100))
                 $lines = @(ConvertTo-DiffText -Rows $rows -ContextLine 1)
                 $gutters = @($lines | Where-Object -FilterScript { $_.Role -cne 'Omitted' } | ForEach-Object -Process { $_.Gutter.Length })

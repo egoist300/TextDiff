@@ -4,7 +4,7 @@
 #
 # 最も重視するのはエスケープ。比較する行には < > & が含まれることがあり、エスケープが漏れると
 # 表示が崩れるだけでなく、内容がタグとして解釈されて表示されない。
-# 証跡の欠落になるため、正しさの問題として扱う。
+# 差分の内容が欠落するため、正しさの問題として扱う。
 #
 # 次に重視するのは、左右のペインの行数が一致すること。一致しないと行が上下にずれ、
 # 左右を比較できない。
@@ -27,7 +27,7 @@ BeforeAll {
             .PARAMETER After
                 変更後の行の配列。
             #>
-            param([string]$Label = 'テーブル定義', [string[]]$Before, [string[]]$After)
+            param([string]$Label = 'アプリ設定', [string[]]$Before, [string[]]$After)
             return @{ Label = $Label; Rows = @(Get-DiffAlignment -BeforeLines $Before -AfterLines $After) }
         }
 
@@ -65,7 +65,7 @@ Describe "ConvertTo-DiffHtml" {
 
         It "CSS と JavaScript を埋め込む（外部を参照しない）" {
             InModuleScope TextDiff {
-                # 証跡のフォルダを別のマシンにコピーしても、表示が崩れないようにするため。
+                # HTML ファイルを別のマシンにコピーしても、表示が崩れないようにするため。
                 $html = ConvertTo-DiffHtml -Title 'T' -Sections @(New-Section -Before @('a') -After @('b'))
 
                 $html | Should -MatchExactly '<style>'
@@ -86,7 +86,7 @@ Describe "ConvertTo-DiffHtml" {
 
         It "凡例を含める" {
             InModuleScope TextDiff {
-                # 証跡は差分ツールに慣れていない人も読むため、配色だけで意味が伝わる前提にしない。
+                # 差分ツールに慣れていない人も HTML を読むため、配色だけで意味が伝わる前提にしない。
                 $html = ConvertTo-DiffHtml -Title 'T' -Sections @(New-Section -Before @('a') -After @('b'))
 
                 $html | Should -MatchExactly '削除された行'
@@ -187,7 +187,7 @@ Describe "ConvertTo-DiffHtml" {
                 # 「差分なし」と区別できない表示にしない。
                 # 検証できていない実行を「変更なし」と誤読させることが、最も避けるべき結果のため。
                 $html = ConvertTo-DiffHtml -Title 'T' -Sections @(
-                    @{ Label = 'テーブル定義'; Rows = @(); Unverified = @('!!! 検証不能: before の取得に失敗 !!!') }
+                    @{ Label = 'アプリ設定'; Rows = @(); Unverified = @('!!! 検証不能: before の取得に失敗 !!!') }
                 )
 
                 $html | Should -MatchExactly '検証不能'
@@ -212,13 +212,13 @@ Describe "ConvertTo-DiffHtml" {
         It "セクションの数だけカードを作成する" {
             InModuleScope TextDiff {
                 $html = ConvertTo-DiffHtml -Title 'T' -Sections @(
-                    New-Section -Label 'テーブル定義' -Before @('a') -After @('b')
-                    New-Section -Label 'カラム一覧' -Before @('c') -After @('d')
+                    New-Section -Label 'アプリ設定' -Before @('a') -After @('b')
+                    New-Section -Label '接続設定' -Before @('c') -After @('d')
                 )
 
                 ([regex]::Matches($html, 'class="card-head"')).Count | Should -BeExactly 2
-                $html | Should -MatchExactly 'テーブル定義'
-                $html | Should -MatchExactly 'カラム一覧'
+                $html | Should -MatchExactly 'アプリ設定'
+                $html | Should -MatchExactly '接続設定'
             }
         }
 

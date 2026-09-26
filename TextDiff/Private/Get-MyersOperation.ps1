@@ -3,7 +3,7 @@
 function Get-MyersOperation {
     <#
     .SYNOPSIS
-        Myers 法で、変更前から変更後への最短の編集操作（Same / Deleted / Added）を求める。
+        Myers 法で、変更前から変更後への最短の編集操作（Same / Deleted / Added）を算出する。
     .DESCRIPTION
         Changed（変更）の判定は行いません。削除行と追加行の対応付けは Get-DiffAlignment が行います。
     .PARAMETER Left

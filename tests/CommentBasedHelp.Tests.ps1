@@ -55,7 +55,7 @@ BeforeAll {
         .PARAMETER Label
             食い違いの説明の先頭に付ける、関数を示す文字列。
         .PARAMETER RequireComplete
-            実在する引数がすべて記載されていることまで求める。
+            実在する引数がすべて記載されていることまで要求する。
         #>
         param($HelpContent, $ParamBlock, [string]$Label, [switch]$RequireComplete)
 

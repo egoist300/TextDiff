@@ -18,9 +18,9 @@ Describe "Format-DiffGutter" {
         }
     }
 
-    It "行番号が無いときは、桁数分の空白を置く" {
+    It "行番号が無いときは、桁数分の空白を配置する" {
         InModuleScope TextDiff {
-            # 反対側にしか無い行でも、見出しの幅を揃えるため。
+            # 反対側にしか無い行でも、見出しの幅を統一するため。
             Format-DiffGutter -Marker '+' -Width 3 | Should -BeExactly '     + '
         }
     }

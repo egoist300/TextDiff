@@ -70,8 +70,8 @@ Describe "TextDiff モジュール" {
             $psData.ProjectUri | Should -Not -BeNullOrEmpty
         }
 
-        It "CHANGELOG.md に今の版の見出しがある" {
-            # PowerShell Gallery に公開した版は上書きできないため、変更内容を公開前に記載する。
+        It "CHANGELOG.md に今のバージョンの見出しがある" {
+            # PowerShell Gallery に公開したバージョンは上書きできないため、変更内容を公開前に記載する。
             $version = (Import-PowerShellDataFile -Path $script:manifestPath).ModuleVersion
             $changelog = Get-Content -LiteralPath (Join-Path -Path $script:repoRoot -ChildPath 'CHANGELOG.md') -Raw -Encoding UTF8
 
@@ -81,8 +81,8 @@ Describe "TextDiff モジュール" {
 
     Context "公開範囲" {
 
-        It "公開される関数は、Public に置いた関数とマニフェストの一覧に一致する" {
-            # 置き場所と公開の一覧がずれると、Public にあるのに外から呼べない関数か、
+        It "公開される関数は、Public に配置した関数とマニフェストの一覧に一致する" {
+            # 配置と公開の一覧が一致しないと、Public にあるのに外から呼べない関数か、
             # Private にあるのに公開される関数ができるため。
             $inPublic = @(Get-SourceFile -Folder Public | ForEach-Object -MemberName BaseName | Sort-Object -CaseSensitive)
             $declared = @((Import-PowerShellDataFile -Path $script:manifestPath).FunctionsToExport | Sort-Object -CaseSensitive)
@@ -113,10 +113,10 @@ Describe "TextDiff モジュール" {
             & $script:module { $ErrorActionPreference } | Should -BeExactly 'Stop'
         }
 
-        It "呼び出し元の ErrorActionPreference は変えない" {
-            # モジュールの設定が利用者のスクリプトに漏れると、利用者のエラー処理が変わる。
+        It "呼び出し元の ErrorActionPreference は変更しない" {
+            # モジュールの設定が利用者のスクリプトに漏れると、利用者のエラー処理が変化する。
             # 漏れる経路はグローバル変数だけのため、グローバル変数の値を直接確認する。
-            # スクリプトのスコープで設定して読み取ると、グローバル変数が変わってもスクリプトの変数が優先され、検出できない。
+            # スクリプトのスコープで設定して読み取ると、グローバル変数が変更されてもスクリプトの変数が優先され、検出できない。
             $probePath = Join-Path -Path $TestDrive -ChildPath 'probe.ps1'
             $probe = @"
 `$global:ErrorActionPreference = 'Continue'
@@ -137,8 +137,8 @@ Import-Module -Name '$script:manifestPath' -Force
 
         It "リポジトリのすべてのスクリプト（.ps1 / .psm1）が、#Requires -Version 5.1 と空行で始まる" {
             # 動作を確認しているのは Windows PowerShell 5.1 だけ。どのファイルから読み込まれても、
-            # 5.1 より古い版では、構文の違いで失敗する前に、版の不足として停止させる。
-            # 先頭に置くのは、ファイルを開いてすぐ見えるようにするため。
+            # 5.1 より古いバージョンでは、構文の違いで失敗する前に、バージョンの不足として停止させる。
+            # 先頭に配置するのは、ファイルを開いてすぐ確認できるようにするため。
             # 空行を挟むのは、直後にヘルプを書くスクリプトで、Get-Help がヘルプを認識するため。
             $gitDir = (Join-Path -Path $script:repoRoot -ChildPath '.git') + [System.IO.Path]::DirectorySeparatorChar
             $scripts = @(Get-ChildItem -LiteralPath $script:repoRoot -File -Recurse -Force |
@@ -163,7 +163,7 @@ Import-Module -Name '$script:manifestPath' -Force
 
         It "Public と Private は 1 ファイル 1 関数で、ファイル名は関数名と同じ" {
             # 関数からファイルを名前だけで辿れる状態を保つ。
-            # 関数の中で定義した関数も数える。最上位だけを数えると、関数の中に補助関数を置く形を検出できない。
+            # 関数の中で定義した関数も対象にする。最上位だけを対象にすると、関数の中に補助関数を配置する形を検出できない。
             $violations = foreach ($file in Get-SourceFile) {
                 $fileAst = Get-FileAst -Path $file.FullName
                 $statements = @($fileAst.EndBlock.Statements)
@@ -212,7 +212,7 @@ Import-Module -Name '$script:manifestPath' -Force
             }
         }
 
-        It "角括弧を含むフォルダに置いても、関数をすべて読み込む" {
+        It "角括弧を含むフォルダに配置しても、関数をすべて読み込む" {
             # -Path は角括弧をワイルドカードとして解釈し、1 ファイルも見つけられない。
             # 後片付けは -LiteralPath で行う。TestDrive の後片付けは -Path で削除するため、
             # 角括弧を含むフォルダを残すと Pester 自身が失敗する。

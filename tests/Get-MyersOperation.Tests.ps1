@@ -70,7 +70,7 @@ Describe "Get-MyersOperation" {
         }
     }
 
-    It "先頭への挿入を Same の前に置く" {
+    It "先頭への挿入を Same の前に配置する" {
         InModuleScope TextDiff {
             $ops = @(Get-MyersOperation -Left @(2) -Right @(1, 2))
 

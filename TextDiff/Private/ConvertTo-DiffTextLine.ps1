@@ -29,7 +29,7 @@ function ConvertTo-DiffTextLine {
         [int]$OmittedCount = 0
     )
 
-    # 行はこの関数だけで作成する。どの行にも同じ項目を持たせ、Format-Table の列を揃えるため。
+    # 行はこの関数だけで作成する。どの行にも同じ項目を持たせ、Format-Table の列を統一するため。
     # 文字列ではなく断片の配列で返すのは、呼び出し側が変更箇所だけ色を変更できるようにするため。
     $lineSegments = if ($PSCmdlet.ParameterSetName -ceq 'Text') {
         [PSCustomObject]@{ PSTypeName = 'TextDiff.Segment'; Text = $Text; Changed = $false }

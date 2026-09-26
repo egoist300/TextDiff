@@ -2,7 +2,7 @@
 
 # Get-DiffAlignment のテスト。
 #
-# 行の対応付けを行うのはこの関数だけで、コンソール表示も HTML 出力もこの結果を使うため、テストを重点的に置く。
+# 行の対応付けを行うのはこの関数だけで、コンソール表示も HTML 出力もこの結果を使うため、重点的にテストする。
 #
 # 特に重視するのは Changed の判定。隣接する削除行と追加行をすべて対応付けると、
 # 無関係な削除と追加まで変更と誤認し、行内の強調が行全体に付いて読めなくなる。
@@ -130,7 +130,7 @@ Describe "Get-DiffAlignment" {
             }
         }
 
-        It "別の列への置き換えは Changed にしない" {
+        It "別の列への置換は Changed にしない" {
             InModuleScope TextDiff {
                 # 削除と追加が偶然隣接しただけ。対応付けると行全体が強調されて読めなくなるため。
                 $rows = @(Get-DiffAlignment -BeforeLines @('    status_code character(2) NOT NULL,') -AfterLines @('    contact_email_address text,'))
@@ -206,7 +206,7 @@ Describe "Get-DiffAlignment" {
 
     Context "戻り値の形" {
 
-        It "Changed には左右の内容が両方入る" {
+        It "Changed には左右の内容が両方含まれる" {
             InModuleScope TextDiff {
                 $rows = @(Get-DiffAlignment -BeforeLines @('aaa1') -AfterLines @('aaa2'))
 

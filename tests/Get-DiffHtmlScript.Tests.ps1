@@ -14,7 +14,7 @@ Describe "Get-DiffHtmlScript" {
 
     It "スクリプトは外部ファイルを読み込まない" {
         InModuleScope TextDiff {
-            # src= で外部を参照すると、証跡を別のマシンにコピーした時点で動作しなくなるため。
+            # src= で外部を参照すると、HTML ファイルを別のマシンにコピーした時点で動作しなくなるため。
             $script = Get-DiffHtmlScript
 
             $script | Should -Not -MatchExactly 'src\s*='

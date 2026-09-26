@@ -12,7 +12,7 @@ function Get-DiffHtmlScript {
     param()
 
     return @'
-// 左右のペインのスクロール位置を合わせる。
+// 左右のペインのスクロール位置を同期する。
 // 動かない環境でも各ペインは独立にスクロールできるため、閲覧自体は成立する。
 (function () {
   var panes = Array.prototype.slice.call(document.querySelectorAll('.pane'));

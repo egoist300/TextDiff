@@ -26,7 +26,7 @@ function Get-LineSimilarity {
 
     # LCS（最長共通部分列）を使わないのは、対応付けの判定のためだけに計算すると、判定の処理時間が差分計算の本体を上回るため。
     # 対応付けたい変更（桁数・日付・コード値の変更）は先頭と末尾が共通で、中央だけが異なるので、この近似で十分。
-    # 列自体が置き換わった場合は共通部分が短く、類似度は低くなる。
+    # 列自体が別の列に置換された場合は共通部分が短く、類似度は低くなる。
     $limit = [Math]::Min($Left.Length, $Right.Length)
     $head = 0
     while ($head -lt $limit -and $Left[$head] -ceq $Right[$head]) { $head++ }

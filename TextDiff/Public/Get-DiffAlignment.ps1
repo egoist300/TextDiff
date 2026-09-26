@@ -15,7 +15,7 @@ function Get-DiffAlignment {
         削除行と追加行を Changed として対応付ける類似度の下限（0.0〜1.0）。
         既定の 0.5 は、行の半分以上が共通なら同じ行の変更とみなすことを表します。
     .OUTPUTS
-        TextDiff.DiffRow。次の項目を持つ [PSCustomObject] を、変更前・変更後の並び順で返します。
+        TextDiff.DiffRow。次の項目を持つ [PSCustomObject] を、変更前・変更後の行の順序で返します。
             Kind    = 'Same' | 'Changed' | 'Deleted' | 'Added'
             LeftNo  = 変更前の行番号（1 始まり）。Added のときは $null
             RightNo = 変更後の行番号（1 始まり）。Deleted のときは $null
@@ -33,7 +33,8 @@ function Get-DiffAlignment {
     [CmdletBinding()]
     [OutputType('TextDiff.DiffRow')]
     param(
-        # NOTE: AllowEmptyString が必須（理由は ConvertTo-LineId のコメントを参照）。
+        # NOTE: AllowEmptyString が必須。Mandatory な [string[]] は、空文字を含む配列を
+        #       「引数が空の文字列である」として拒否する。比較する行には空行が含まれる。
         [Parameter(Mandatory)] [AllowEmptyCollection()] [AllowEmptyString()] [string[]]$BeforeLines,
         [Parameter(Mandatory)] [AllowEmptyCollection()] [AllowEmptyString()] [string[]]$AfterLines,
         [ValidateRange(0.0, 1.0)] [double]$SimilarityThreshold = 0.5
@@ -67,7 +68,7 @@ function Get-DiffAlignment {
             continue
         }
 
-        # 連続する削除と追加を 1 つのブロックとして取り出す。Myers 法の出力では削除が追加より先に並ぶとは
+        # 連続する削除と追加を 1 つのブロックとして抽出する。Myers 法の出力では削除が追加より先に出現するとは
         # 限らないため、ブロック内で分類してから対応付ける。
         $deleted = [System.Collections.Generic.List[int]]::new()
         $added = [System.Collections.Generic.List[int]]::new()
@@ -104,7 +105,7 @@ function Get-DiffAlignment {
         }
 
         # 対応付けなかった行を、元の順序のまま並べる。
-        # 削除行を追加行より先に置くのは、diff の慣習（- が先、+ が後）に合わせるため。
+        # 削除行を追加行より先に配置するのは、diff の慣習（- が先、+ が後）に合わせるため。
         for ($deletedIndex = 0; $deletedIndex -lt $deleted.Count; $deletedIndex++) {
             if ($usedLeft[$deletedIndex]) { continue }
             $pending.Add(@{

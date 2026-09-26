@@ -11,7 +11,7 @@ function Get-DiffHtmlLegend {
     [OutputType([string])]
     param()
 
-    # 差分ツールに慣れていない人も証跡を読むため、配色だけで意味が伝わる前提にしない。
+    # 差分ツールに慣れていない人も HTML を読むため、配色だけで意味が伝わる前提にしない。
     return @'
   <div class="legend">
     <span><i class="d"></i>削除された行</span>

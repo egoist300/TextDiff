@@ -5,7 +5,7 @@ function ConvertTo-DiffHtml {
     .SYNOPSIS
         セクションごとの対応付けの結果を、1 つの HTML 文書に変換する。
     .DESCRIPTION
-        セクション（テーブル定義、カラム一覧など）ごとに 1 つのカードを作成し、変更前と変更後の
+        セクション（比較する対象のファイルなど）ごとに 1 つのカードを作成し、変更前と変更後の
         2 つのペインを左右に並べます。左右のペインのスクロールは、埋め込んだ JavaScript で同期します。
         JavaScript が無効な環境でも、各ペインを個別にスクロールして閲覧できます。
 
@@ -14,7 +14,7 @@ function ConvertTo-DiffHtml {
     .PARAMETER Title
         文書の題名。<title> と先頭の見出しに使います。HTML としてエスケープしてから埋め込みます。
     .PARAMETER Sections
-        @{ Label = 'テーブル定義'; Rows = <Get-DiffAlignment の戻り値>; Unverified = @('...') }の配列。
+        @{ Label = 'アプリ設定'; Rows = <Get-DiffAlignment の戻り値>; Unverified = @('...') }の配列。
         Rows には Get-DiffAlignment の戻り値（TextDiff.DiffRow）だけを渡せます。
         Unverified を指定したセクションは、差分の代わりにその内容を表示します。
         変更前か変更後の取得に失敗し、比較できないセクションに使います。
@@ -54,7 +54,7 @@ function ConvertTo-DiffHtml {
     [void]$builder.AppendLine('<head>')
     [void]$builder.AppendLine('<meta charset="utf-8">')
     [void]$builder.AppendLine("<title>$escapedTitle</title>")
-    # CSS と JavaScript を埋め込むのは、証跡のフォルダを別のマシンにコピーしても表示が崩れないようにするため。
+    # CSS と JavaScript を埋め込むのは、HTML ファイルを別のマシンにコピーしても表示が崩れないようにするため。
     [void]$builder.AppendLine('<style>')
     [void]$builder.AppendLine((Get-DiffHtmlStyle))
     [void]$builder.AppendLine('</style>')
@@ -89,7 +89,7 @@ function ConvertTo-DiffHtml {
 
         # 変更前と変更後を左右に並べ、片側にしか無い行を斜線で示す。変更・削除・追加を位置で区別できる。
         # 削除行と追加行を上下に並べる表示では、どの行が対応するのか読み取れない。
-        # 証跡として後から読むため、ConvertTo-DiffText と異なり行を省略しない。
+        # HTML は保存して後から読むため、ConvertTo-DiffText と異なり行を省略しない。
         [void]$builder.AppendLine('  <div class="side"><div>before（適用前）</div><div>after（適用後）</div></div>')
         [void]$builder.AppendLine('  <div class="panes">')
         [void]$builder.AppendLine((Get-DiffHtmlPane -Rows $rows -Side 'left'))
