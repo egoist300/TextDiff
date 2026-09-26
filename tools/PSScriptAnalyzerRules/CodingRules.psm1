@@ -3,33 +3,33 @@
 # 書き方の決まり（~/.claude/rules/powershell.md）を、PSScriptAnalyzer のカスタムルールとして検査する。
 #
 # PSScriptAnalyzerSettings.psd1 の CustomRulePath から読み込まれる。CI の lint ジョブと、
-# VS Code の PowerShell 拡張（ワークスペース直下の設定ファイルを自動で拾う）の両方で動くため、
-# 書いている最中に警告が出る。ルールそのものが違反を見つけられることは tests/CodingRules.Tests.ps1 が確かめる。
+# VS Code の PowerShell 拡張（ワークスペース直下の設定ファイルを自動で読み込む）の両方で実行されるため、
+# 編集中に警告が表示される。ルールが違反を検出できることは tests/CodingRules.Tests.ps1 が確認する。
 #
-# 【PowerShell 自身の名前は、大小文字を区別せずに比べる】
-# コマンド名・引数名・型名・変数名は、PowerShell が大小文字を区別しない。sort-object も
-# Sort-Object として動くので、ここでの照合は -ieq / -icontains で書く。
+# 【PowerShell 自身の名前は、大文字と小文字を区別せずに比較する】
+# コマンド名・引数名・型名・変数名は、PowerShell が大文字と小文字を区別しない。sort-object も
+# Sort-Object として動作するため、ここでの照合は -ieq / -icontains で書く。
 #
-# 【ルールはファイル全体に対して 1 回だけ調べる】
-# ScriptBlockAst を受け取るルールは、入れ子のスクリプトブロックごとにも呼ばれる。
-# 毎回すべてを調べると同じ指摘が重複するため、親の無いブロック（ファイル全体）のときだけ調べる。
+# 【ルールはファイル全体に対して 1 回だけ検査する】
+# ScriptBlockAst を受け取るルールは、入れ子のスクリプトブロックごとにも呼び出される。
+# 毎回すべてを検査すると同じ指摘が重複するため、親の無いブロック（ファイル全体）のときだけ検査する。
 
 Set-StrictMode -Version 3.0
 
-# Pester の構文。テストの書き方そのもので、名前付きにすると読めなくなるため位置指定を許す
+# Pester の構文。名前付きの引数にすると読みにくくなるため、位置指定を許可する。
 $script:PesterDsl = @('Describe', 'Context', 'It', 'BeforeAll', 'AfterAll', 'BeforeEach', 'AfterEach', 'BeforeDiscovery', 'Should', 'Mock', 'InModuleScope')
 
-# 引数の一覧を覚えておく表は、AppDomain（同じプロセスの中で共有される領域）に置く。
-# PSScriptAnalyzer はファイルごとに新しい runspace を作ってこのモジュールを読み込み直すため、
-# モジュールの変数に置くとファイルごとに捨てられ、モジュールのソースを毎回解析し直すことになる。
-# runspace は並行して動くことがあるので ConcurrentDictionary にする
+# 引数の一覧を保持する表は、AppDomain（同じプロセスの中で共有される領域）に保持する。
+# PSScriptAnalyzer はファイルごとに新しい runspace を作成してこのモジュールを読み込み直すため、
+# モジュールの変数に保持するとファイルごとに破棄され、モジュールのソースを毎回解析し直すことになる。
+# runspace は並行して実行されることがあるため、ConcurrentDictionary にする。
 $script:SharedCacheKey = 'TextDiff.CodingRules.CommandParameterCache'
 $script:ModuleCacheKey = 'TextDiff.CodingRules.ModuleFunctionCache'
 
 function ConvertTo-DiagnosticRecord {
     <#
     .SYNOPSIS
-        ルールの指摘を、PSScriptAnalyzer が受け取る DiagnosticRecord にする。
+        ルールの指摘を、PSScriptAnalyzer が受け取る DiagnosticRecord に変換する。
     .PARAMETER RuleName
         ルール名（Measure- を除いた部分）。
     .PARAMETER Message
@@ -54,24 +54,23 @@ function Find-Node {
     <#
     .SYNOPSIS
         構文木から、指定した型の節をすべて返す。
-    .DESCRIPTION
-        呼び出しをまたいで振り分け結果を使い回すと、リポジトリ全体にかけたときに別のファイルの節が
-        返ってきた（並行して動くルールの呼び出しどうしで干渉したと考えられる）。
-        呼び出しをまたいで持つのは、スレッドをまたいでも安全な AppDomain の表だけにする。
     .PARAMETER Ast
-        探す範囲の構文木。
+        検索する範囲の構文木。
     .PARAMETER Type
-        探す節の型。
+        検索する節の型。
     #>
     param(
         [Parameter(Mandatory)] [System.Management.Automation.Language.Ast]$Ast,
         [Parameter(Mandatory)] [type]$Type
     )
+    # 検索結果は呼び出しをまたいで再利用しない。再利用すると、リポジトリ全体に実行したときに別のファイルの節が
+    # 返った（並行して実行されるルールの呼び出しどうしで干渉したと考えられる）。
+    # 呼び出しをまたいで保持するのは、スレッドをまたいでも安全な AppDomain の表だけにする。
     $found = [System.Collections.Generic.List[object]]::new()
     foreach ($node in $Ast.FindAll({ $true }, $true)) {
         if ($Type.IsInstanceOfType($node)) { $found.Add($node) }
     }
-    # ばらして返す。呼び出し側は foreach か @() で受ける（, を付けると @() が「配列を 1 つ持つ配列」になる）
+    # 配列を展開して返す。呼び出し側は foreach か @() で受け取る（, を付けると、@() が「配列を 1 つ持つ配列」になるため）。
     return $found.ToArray()
 }
 
@@ -80,7 +79,7 @@ function Test-FileRoot {
     .SYNOPSIS
         スクリプトブロックがファイル全体（親の無いブロック）かを返す。
     .PARAMETER ScriptBlockAst
-        調べるスクリプトブロック。
+        対象のスクリプトブロック。
     #>
     param([Parameter(Mandatory)] [System.Management.Automation.Language.ScriptBlockAst]$ScriptBlockAst)
     return $null -eq $ScriptBlockAst.Parent
@@ -89,7 +88,7 @@ function Test-FileRoot {
 function ConvertFrom-FunctionDefinition {
     <#
     .SYNOPSIS
-        関数定義の引数を、{ Name; Aliases; IsSwitch } の並びにする。
+        関数定義の引数を、{ Name; Aliases; IsSwitch } の配列に変換する。
     .PARAMETER Definition
         関数定義の構文木。
     #>
@@ -113,7 +112,7 @@ function ConvertFrom-FunctionDefinition {
 function Get-FunctionNameWithoutScope {
     <#
     .SYNOPSIS
-        関数名から script: などのスコープ修飾を外す。
+        関数名から script: などのスコープ修飾を除去する。
     .PARAMETER Name
         関数定義に書かれた名前。
     #>
@@ -124,11 +123,10 @@ function Get-FunctionNameWithoutScope {
 function Get-SharedCommandTable {
     <#
     .SYNOPSIS
-        Get-Command で引いたコマンド（コマンドレットなど）の引数の一覧を覚えておく表を返す。
-    .DESCRIPTION
-        コマンドの引数はプロセスが続く限り変わらないので、プロセスの中で 1 つの表を共有する。
-        コマンド名は大小文字を区別しないので、表もそれに合わせる。
+        Get-Command で取得したコマンド（コマンドレットなど）の引数の一覧を保持する表を返す。
     #>
+    # コマンドの引数はプロセスが続く限り変化しないため、プロセスの中で 1 つの表を共有する。
+    # コマンド名は大文字と小文字を区別しないため、表もそれに合わせる。
     $table = [System.AppDomain]::CurrentDomain.GetData($script:SharedCacheKey)
     if ($null -eq $table) {
         $table = [System.Collections.Concurrent.ConcurrentDictionary[string, object]]::new([System.StringComparer]::OrdinalIgnoreCase)
@@ -140,15 +138,14 @@ function Get-SharedCommandTable {
 function Get-ModuleFunctionTable {
     <#
     .SYNOPSIS
-        TextDiff モジュールの関数（非公開を含む）の引数を、ソースの構文木から読んだ表を返す。
-    .DESCRIPTION
-        テストは InModuleScope の中で非公開の関数を呼ぶため、Get-Command では引けない。
-        VS Code で編集している間に引数が変わりうるので、ソースの更新時刻が変わったら読み直す。
+        TextDiff モジュールの関数（非公開を含む）の引数を、ソースの構文木から読み取った表を返す。
     #>
+    # テストは InModuleScope の中で非公開の関数を呼び出すため、Get-Command では取得できない。ソースから読み取る。
     $moduleRoot = Join-Path -Path (Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent) -ChildPath 'TextDiff'
     $emptyTable = [System.Collections.Concurrent.ConcurrentDictionary[string, object]]::new([System.StringComparer]::OrdinalIgnoreCase)
     if (-not (Test-Path -LiteralPath $moduleRoot -PathType Container)) { return , $emptyTable }
     $files = @(Get-ChildItem -LiteralPath $moduleRoot -Recurse -File -Filter '*.ps1')
+    # VS Code で編集している間に引数が変更されうるため、ソースの更新時刻が変化したら読み込み直す。
     $signature = '{0}:{1}' -f $files.Count, (@($files | ForEach-Object -Process { $_.LastWriteTimeUtc.Ticks } | Measure-Object -Maximum).Maximum)
 
     $cached = [System.AppDomain]::CurrentDomain.GetData($script:ModuleCacheKey)
@@ -200,7 +197,7 @@ function Get-CommandParameterList {
 function Find-Parameter {
     <#
     .SYNOPSIS
-        引数の一覧から、名前・別名・一意に決まる前方一致の省略形で引数を探す。見つからなければ $null。
+        引数の一覧から、名前・別名・一意に決まる前方一致の省略形で引数を検索する。見つからなければ $null。
     .PARAMETER ParameterList
         Get-CommandParameterList が返す引数の一覧。
     .PARAMETER Name
@@ -221,8 +218,6 @@ function Test-NonStringOperand {
     <#
     .SYNOPSIS
         式が文字列になりえない定数（数値、$null、$true、$false）かを返す。
-    .DESCRIPTION
-        これと比べる -eq / -ne は大小文字の扱いを持たないので、c も i も要らない。
     .PARAMETER Operand
         比較演算子の片側の式。
     #>
@@ -236,10 +231,10 @@ function Test-NonStringOperand {
 function Measure-AvoidLineContinuation {
     <#
     .SYNOPSIS
-        バッククォート（`）で行を継続していないかを調べる。
+        バッククォート（`）による行の継続を検出する。
     .DESCRIPTION
-        行末に空白が 1 つ入るだけで継続が切れ、次の行が別の文になります。
-        長い呼び出しはスプラッティングか、演算子やパイプでの自然な改行にします。
+        行末に空白が 1 つあるだけで継続が切れ、次の行が別の文になります。
+        長い呼び出しは、スプラッティングか、演算子やパイプの位置での改行にします。
     .PARAMETER Token
         ファイルのトークン。PSScriptAnalyzer が渡します。
     .OUTPUTS
@@ -259,10 +254,10 @@ function Measure-AvoidLineContinuation {
 function Measure-AvoidSingleLetterVariable {
     <#
     .SYNOPSIS
-        1 文字の変数名を使っていないかを調べる（$_ などの自動変数を除く）。
+        1 文字の変数名を検出する（$_ などの自動変数を除く）。
     .DESCRIPTION
-        呼んだコマンドが、呼び出し元の同名の変数を上書きしえます（Invoke-Pester は $p を上書きする）。
-        名前から役割も読めません。
+        呼び出したコマンドが、呼び出し元の同名の変数を上書きすることがあります（Invoke-Pester は $p を上書きする）。
+        名前から役割も読み取れません。
     .PARAMETER ScriptBlockAst
         検査するスクリプト。PSScriptAnalyzer が渡します。
     .OUTPUTS
@@ -284,9 +279,9 @@ function Measure-AvoidSingleLetterVariable {
 function Measure-AvoidBoolParameter {
     <#
     .SYNOPSIS
-        [bool] の引数を作っていないかを調べる。
+        [bool] の引数を検出する。
     .DESCRIPTION
-        [bool] の引数は -Flag と書けず、-Flag:$true が要ります。[switch] を使います。
+        [bool] の引数は -Flag と書けず、-Flag:$true が必要です。[switch] を使います。
     .PARAMETER ScriptBlockAst
         検査するスクリプト。PSScriptAnalyzer が渡します。
     .OUTPUTS
@@ -310,12 +305,12 @@ function Measure-AvoidBoolParameter {
 function Measure-AvoidPositionalArgument {
     <#
     .SYNOPSIS
-        コマンドに引数を位置で渡していないかを調べる。
+        コマンドに位置指定で渡した引数を検出する。
     .DESCRIPTION
-        位置で渡すと、引数の並びが変わったときに黙って別の引数に入ります。
+        位置指定で渡すと、引数の順序が変更されたときに、エラーにならずに別の引数に割り当てられます。
         Pester の構文（Describe / It / Should / Mock など）と、ネイティブコマンド（powershell.exe など）、
-        & $変数 の呼び出しは対象外です。前者はテストの書き方そのもので、後者は PowerShell の
-        引数ではないか、何が呼ばれるかを静的に決められないためです。
+        & $変数 の呼び出しは対象外です。前者はテストの書き方の一部で、後者は PowerShell の
+        引数ではないか、呼び出す対象を静的に特定できないためです。
     .PARAMETER ScriptBlockAst
         検査するスクリプト。PSScriptAnalyzer が渡します。
     .OUTPUTS
@@ -341,7 +336,7 @@ function Measure-AvoidPositionalArgument {
         $parameterList = Get-CommandParameterList -Name $commandName -LocalFunction $localFunction -ModuleFunction $moduleFunction
         if ($null -eq $parameterList) { continue }
 
-        # -名前 の直後の要素は、その引数がスイッチでなければ値として読み飛ばす
+        # -名前 の直後の要素は、その引数がスイッチでなければ値としてスキップする。
         for ($elementIndex = 1; $elementIndex -lt $elements.Count; $elementIndex++) {
             $element = $elements[$elementIndex]
             if ($element -is [System.Management.Automation.Language.CommandParameterAst]) {
@@ -360,9 +355,9 @@ function Measure-AvoidPositionalArgument {
 function Measure-FormatOperatorInMethodArgument {
     <#
     .SYNOPSIS
-        メソッドの引数に、括弧で囲まない -f を書いていないかを調べる。
+        メソッドの引数にある、括弧で囲んでいない -f を検出する。
     .DESCRIPTION
-        囲まないと "{0} {1}" -f $first, $second の , がメソッドの引数の区切りになり、書式の値が欠けます。
+        囲まないと "{0} {1}" -f $first, $second の , がメソッドの引数の区切りになり、書式の値が欠落します。
     .PARAMETER ScriptBlockAst
         検査するスクリプト。PSScriptAnalyzer が渡します。
     .OUTPUTS
@@ -386,9 +381,10 @@ function Measure-FormatOperatorInMethodArgument {
 function Measure-AvoidStartProcess {
     <#
     .SYNOPSIS
-        Start-Process でコンソールのプログラムを動かしていないかを調べる。
+        Start-Process の呼び出しを検出する。
     .DESCRIPTION
-        -ArgumentList は要素を引用せずに空白でつなぎ、-Wait が無いと ExitCode が空になります。
+        コンソールのプログラムを Start-Process で実行すると、-ArgumentList は要素を引用符で囲まずに空白で連結し、
+        -Wait が無いと ExitCode が空になります。
         & と $LASTEXITCODE か、ProcessStartInfo を使います。
     .PARAMETER ScriptBlockAst
         検査するスクリプト。PSScriptAnalyzer が渡します。
@@ -410,7 +406,7 @@ function Measure-AvoidStartProcess {
 function Measure-StandaloneScriptHeader {
     <#
     .SYNOPSIS
-        単独で実行するスクリプトが、#Requires -Version 5.1 と、すべての引数を書いたヘルプを持つかを調べる。
+        単独で実行するスクリプトが、#Requires -Version 5.1 と、すべての引数を記載したヘルプを持つかを検査する。
     .DESCRIPTION
         ファイル直下に param() を持つものを、単独で実行するスクリプトとみなします。
         tests\ の下は対象外です（Pester が読み込むテストで、単独では実行しない）。
@@ -426,7 +422,7 @@ function Measure-StandaloneScriptHeader {
 
     if (-not (Test-FileRoot -ScriptBlockAst $ScriptBlockAst)) { return }
     if ($null -eq $ScriptBlockAst.ParamBlock) { return }
-    # Windows のパスは大小文字を区別しない
+    # Windows のパスは大文字と小文字を区別しない。
     $filePath = $ScriptBlockAst.Extent.File
     if ($filePath -and $filePath -imatch '[\\/]tests[\\/]') { return }
 
@@ -436,10 +432,10 @@ function Measure-StandaloneScriptHeader {
     }
     $help = $ScriptBlockAst.GetHelpContent()
     if ($null -eq $help) {
-        ConvertTo-DiagnosticRecord -RuleName 'StandaloneScriptHeader' -Extent $ScriptBlockAst.ParamBlock.Extent -Message 'ヘルプが認識されない。#Requires とヘルプの間に空行を入れる'
+        ConvertTo-DiagnosticRecord -RuleName 'StandaloneScriptHeader' -Extent $ScriptBlockAst.ParamBlock.Extent -Message 'ヘルプが認識されない。#Requires とヘルプの間に空行を挿入する'
         return
     }
-    # ヘルプは引数名の大小文字を保持しない
+    # ヘルプは引数名の大文字と小文字を保持しない。
     $documented = @($help.Parameters.Keys)
     foreach ($parameter in $ScriptBlockAst.ParamBlock.Parameters) {
         $name = $parameter.Name.VariablePath.UserPath
@@ -452,11 +448,11 @@ function Measure-StandaloneScriptHeader {
 function Measure-ImplicitCaseComparison {
     <#
     .SYNOPSIS
-        大小文字の扱いを明示していない比較演算子を調べる。
+        大文字と小文字の扱いを明示していない比較演算子を検出する。
     .DESCRIPTION
-        PowerShell の比較演算子は既定で大小文字を区別しません。区別するものは -ceq のように c を、
+        PowerShell の比較演算子は、既定で大文字と小文字を区別しません。区別するものは -ceq のように c を、
         区別しないのが正しいもの（PowerShell 自身の名前、Windows のファイル名など）は -ieq のように i を付けます。
-        -eq / -ne は数値や $null にも使うため、相手が数値・$null・真偽値の定数なら求めません。
+        -eq / -ne は、比較の相手が数値・$null・真偽値の定数なら対象外です。
     .PARAMETER ScriptBlockAst
         検査するスクリプト。PSScriptAnalyzer が渡します。
     .OUTPUTS
@@ -471,6 +467,7 @@ function Measure-ImplicitCaseComparison {
     $equalityOperators = @('eq', 'ne')
     foreach ($node in (Find-Node -Ast $ScriptBlockAst -Type ([System.Management.Automation.Language.BinaryExpressionAst]))) {
         $operatorName = $node.ErrorPosition.Text.TrimStart('-').ToLowerInvariant()
+        # 数値・$null・真偽値の定数と比較する -eq / -ne には、大文字と小文字の区別が無いため、c と i の指定を要求しない。
         $comparesNonString = (Test-NonStringOperand -Operand $node.Left) -or (Test-NonStringOperand -Operand $node.Right)
         $isImplicitEquality = ($equalityOperators -ccontains $operatorName) -and -not $comparesNonString
         if (($stringOperators -ccontains $operatorName) -or $isImplicitEquality) {
@@ -482,12 +479,12 @@ function Measure-ImplicitCaseComparison {
 function Measure-InexactShouldOperator {
     <#
     .SYNOPSIS
-        大小文字を区別しない Should の比較を調べる。
+        大文字と小文字を区別しない Should の比較を検出する。
     .DESCRIPTION
-        -Be / -Match / -BeLike / -Contain / -BeIn と、-Throw のメッセージ照合は大小文字を区別せず、
-        大小文字の不具合がテストをすり抜けます。-BeExactly / -MatchExactly / -BeLikeExactly を使います。
-        -Contain / -BeIn は、-ccontains で比べた結果を Should -BeTrue で確かめます。
-        -Throw は、メッセージではなく -ExceptionType か -ErrorId で確かめます。
+        -Be / -Match / -BeLike / -Contain / -BeIn と、-Throw のメッセージ照合は大文字と小文字を区別せず、
+        大文字と小文字に関する不具合をテストで検出できません。-BeExactly / -MatchExactly / -BeLikeExactly を使います。
+        -Contain / -BeIn は、-ccontains で比較した結果を Should -BeTrue で確認します。
+        -Throw は、メッセージではなく -ExceptionType か -ErrorId で確認します。
         メッセージを照合しない -Throw と、-Not -Throw は対象外です。
     .PARAMETER ScriptBlockAst
         検査するスクリプト。PSScriptAnalyzer が渡します。
