@@ -91,8 +91,16 @@ Describe "ConvertTo-DiffHtml" {
 
                 $html | Should -MatchExactly '削除された行'
                 $html | Should -MatchExactly '追加された行'
-                $html | Should -MatchExactly '行内で変わった部分'
+                $html | Should -MatchExactly '行内の変更箇所'
                 $html | Should -MatchExactly '反対側に対応する行が無い'
+            }
+        }
+
+        It "左右のペインの見出しは、変更前と変更後" {
+            InModuleScope TextDiff {
+                $html = ConvertTo-DiffHtml -Title 'T' -Sections @(New-Section -Before @('a') -After @('b'))
+
+                $html | Should -MatchExactly '<div class="side"><div>変更前</div><div>変更後</div></div>'
             }
         }
     }

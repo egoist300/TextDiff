@@ -90,7 +90,7 @@ function ConvertTo-DiffHtml {
         # 変更前と変更後を左右に並べ、片側にしか無い行を斜線で示す。変更・削除・追加を位置で区別できる。
         # 削除行と追加行を上下に並べる表示では、どの行が対応するのか読み取れない。
         # HTML は保存して後から読むため、ConvertTo-DiffText と異なり行を省略しない。
-        [void]$builder.AppendLine('  <div class="side"><div>before（適用前）</div><div>after（適用後）</div></div>')
+        [void]$builder.AppendLine('  <div class="side"><div>変更前</div><div>変更後</div></div>')
         [void]$builder.AppendLine('  <div class="panes">')
         [void]$builder.AppendLine((Get-DiffHtmlPane -Rows $rows -Side 'left'))
         [void]$builder.AppendLine((Get-DiffHtmlPane -Rows $rows -Side 'right'))

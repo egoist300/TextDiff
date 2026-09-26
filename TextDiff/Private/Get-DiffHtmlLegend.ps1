@@ -16,7 +16,7 @@ function Get-DiffHtmlLegend {
   <div class="legend">
     <span><i class="d"></i>削除された行</span>
     <span><i class="a"></i>追加された行</span>
-    <span><i class="m"></i>行内で変わった部分</span>
+    <span><i class="m"></i>行内の変更箇所</span>
     <span><i class="e"></i>反対側に対応する行が無い</span>
   </div>
 '@
