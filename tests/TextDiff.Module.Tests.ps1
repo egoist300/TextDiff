@@ -162,12 +162,14 @@ Import-Module -Name '$script:manifestPath' -Force
         }
 
         It "Public と Private は 1 ファイル 1 関数で、ファイル名は関数名と同じ" {
-            # 関数からファイルを名前だけで辿れる状態を保つ
+            # 関数からファイルを名前だけで辿れる状態を保つ。
+            # 関数の中で定義した関数も数える。最上位だけを数えると、関数の中に補助関数を置く形を検出できない。
             $violations = foreach ($file in Get-SourceFile) {
-                $statements = @((Get-FileAst -Path $file.FullName).EndBlock.Statements)
-                $functions = @($statements | Where-Object -FilterScript { $_ -is [System.Management.Automation.Language.FunctionDefinitionAst] })
+                $fileAst = Get-FileAst -Path $file.FullName
+                $statements = @($fileAst.EndBlock.Statements)
+                $functions = @($fileAst.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true))
                 if ($statements.Count -ne 1 -or $functions.Count -ne 1 -or $functions[0].Name -cne $file.BaseName) {
-                    '{0}\{1}' -f $file.Directory.Name, $file.Name
+                    '{0}\{1}（関数: {2}）' -f $file.Directory.Name, $file.Name, (($functions | ForEach-Object -MemberName Name) -join ', ')
                 }
             }
 
