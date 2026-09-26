@@ -135,16 +135,25 @@ Import-Module -Name '$script:manifestPath' -Force
 
     Context "ファイルの置き方" {
 
-        It "リポジトリのすべてのスクリプト（.ps1 / .psm1）が #Requires -Version 5.1 を宣言する" {
+        It "リポジトリのすべてのスクリプト（.ps1 / .psm1）が、#Requires -Version 5.1 と空行で始まる" {
             # 動作を確かめているのは Windows PowerShell 5.1 だけ。どのファイルから読み込まれても、
-            # 5.1 より古い版では書き方の違いで壊れる前に、版の不足として止まるようにする
+            # 5.1 より古い版では書き方の違いで壊れる前に、版の不足として止まるようにする。
+            # 置き場所を先頭にそろえるのは、ファイルを開いてすぐ見えるようにするため。
+            # 空行を挟むのは、直後にヘルプを書くスクリプトで、Get-Help がヘルプを認識するため
             $gitDir = (Join-Path -Path $script:repoRoot -ChildPath '.git') + [System.IO.Path]::DirectorySeparatorChar
             $scripts = @(Get-ChildItem -LiteralPath $script:repoRoot -File -Recurse -Force |
                     Where-Object -FilterScript { @('.ps1', '.psm1') -icontains $_.Extension -and -not $_.FullName.StartsWith($gitDir, [System.StringComparison]::OrdinalIgnoreCase) })
             $violations = foreach ($file in $scripts) {
+                $relativePath = $file.FullName.Substring($script:repoRoot.Length + 1)
+                # ReadAllText は先頭の BOM を取り除いて返す
+                $lines = [System.IO.File]::ReadAllText($file.FullName, [System.Text.Encoding]::UTF8) -csplit "`n"
+                if ($lines.Count -lt 2 -or $lines[0] -cne '#Requires -Version 5.1' -or $lines[1] -cne '') {
+                    "$relativePath（先頭の 2 行が「#Requires -Version 5.1」と空行ではない）"
+                    continue
+                }
                 $requirements = (Get-FileAst -Path $file.FullName).ScriptRequirements
                 if ($null -eq $requirements -or $requirements.RequiredPSVersion -cne [version]'5.1') {
-                    $file.FullName.Substring($script:repoRoot.Length + 1)
+                    "$relativePath（PowerShell が #Requires として読んでいない）"
                 }
             }
 
