@@ -1,17 +1,17 @@
 ﻿#Requires -Version 5.1
 
-# コメントベースヘルプが実装とずれていないかを機械で検査する。
+# コメントベースヘルプと実装の食い違いを検査する。
 #
-# ヘルプはずれても lint もテストも落ちない。読む人はヘルプを信じるので、
-# 書いていない引数は「無い」と受け取られる。
-# 検査するのは対応関係だけで、説明文の中身は見ない。
+# ヘルプが実装と食い違っても、lint もテストも失敗しない。読む人はヘルプを信じるため、
+# 記載していない引数は「存在しない」と解釈される。
+# 検査するのは対応関係だけで、説明文の内容は検査しない。
 
 BeforeAll {
     Set-StrictMode -Version 3.0
     $script:repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path
 
     # すべての関数（テストの補助関数と、関数の中で定義した関数を含む）で、ヘルプと引数の記載を必須にする。
-    # 公開する関数は Get-Help で読む人がいるので、使用例も必須にする
+    # 公開する関数は Get-Help で読む人がいるため、使用例も必須にする。
     function Get-PublicSourceFile {
         <#
         .SYNOPSIS
@@ -43,8 +43,7 @@ BeforeAll {
         return [System.Management.Automation.Language.Parser]::ParseFile($Path, [ref]$tokens, [ref]$errors)
     }
 
-    # ヘルプが記載しているパラメータ名と、実際の param() を突き合わせる。
-    # 引数名は PowerShell の名前なので、大小文字を区別せずに比べる
+    # 引数名は PowerShell の名前のため、大文字と小文字を区別せずに比較する。
     function Get-HelpMismatch {
         <#
         .SYNOPSIS
@@ -99,7 +98,7 @@ Describe "コメントベースヘルプと実装の対応" {
     }
 
     It "公開する関数には .SYNOPSIS と .EXAMPLE がある" {
-        # PowerShell Gallery から入れた人が最初に読むのは Get-Help の使用例
+        # PowerShell Gallery からインストールした人が最初に読むのは、Get-Help の使用例のため。
         $violations = foreach ($file in Get-PublicSourceFile) {
             foreach ($function in (Get-FileAst -Path $file.FullName).FindAll($script:functionAstFilter, $false)) {
                 $help = $function.GetHelpContent()
@@ -112,7 +111,7 @@ Describe "コメントベースヘルプと実装の対応" {
     }
 
     It "検査対象が 0 件になっていない" {
-        # 対象の取り方を壊すと、この Describe が無条件に通る
+        # 対象の取得方法が壊れると、この Describe が無条件に成功するため。
         @(Get-PublicSourceFile).Count | Should -BeExactly 3
         @(Get-RepositoryScriptFile).Count | Should -BeGreaterThan 30
     }

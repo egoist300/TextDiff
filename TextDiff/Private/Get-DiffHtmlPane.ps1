@@ -3,17 +3,15 @@
 function Get-DiffHtmlPane {
     <#
     .SYNOPSIS
-        片側（before または after）のペインを組み立てる。
+        変更前または変更後のペインの HTML を生成する。
     .DESCRIPTION
-        左右のペインは同じ行数になります。反対側にしか無い行の位置には
-        空の行を置き、斜線で「対応する行が無い」ことを示します。
-        行数を揃えないと、行が上下にずれて左右の比較が成立しません。
+        反対側にしか無い行の位置には空行を置き、斜線で対応する行が無いことを示します。
     .PARAMETER Rows
-        Get-DiffAlignment が返す行の対応づけ（TextDiff.DiffRow の配列）。それ以外は受け付けません。
+        Get-DiffAlignment が返す行の対応付け（TextDiff.DiffRow の配列）。それ以外は受け付けません。
     .PARAMETER Side
-        組み立てる側。'left' なら before、'right' なら after の行を並べます。
+        生成する側。'left' は変更前、'right' は変更後です。
     .OUTPUTS
-        [string]
+        [string] ペインの HTML。
     #>
     [CmdletBinding()]
     [OutputType([string])]
@@ -39,7 +37,7 @@ function Get-DiffHtmlPane {
         }
 
         if ($null -eq $number) {
-            # 反対側にしか無い行。斜線を出す
+            # 反対側にしか無い行も空行を置き、左右の行数を揃える。揃えないと行が上下にずれ、左右を比較できない。
             [void]$builder.AppendLine("        <tr$rowClass><td class=""ln""></td><td class=""tx empty""></td></tr>")
             continue
         }

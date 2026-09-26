@@ -3,22 +3,22 @@
 # Get-DiffHtmlPane のテスト。
 
 BeforeAll {
-    # テストのコード自身も StrictMode 3.0 で動かす。モジュールの中は TextDiff.psm1 が設定している
+    # テストのコード自身も StrictMode 3.0 で実行する。モジュールの中は TextDiff.psm1 が設定する。
     Set-StrictMode -Version 3.0
-    # テスト対象はモジュールとして読み込み、テストの中身はモジュールの中（InModuleScope）で動かす。
-    # 非公開の関数はモジュールの中からしか呼べない。ファイルごとに読み直すので、前のファイルが置いた関数は残らない
+    # テスト対象はモジュールとして読み込み、テストはモジュールの中（InModuleScope）で実行する。
+    # 非公開の関数はモジュールの中からしか呼び出せない。ファイルごとに読み込み直すため、前のファイルが定義した関数は残らない。
     Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\TextDiff\TextDiff.psd1') -Force
 }
 
 Describe "Get-DiffHtmlPane" {
 
-    # 証跡フォルダごと別のマシンへコピーしても崩れないことが要件なので、
-    # 外部への参照を作らないこと（CSS も JS も埋め込み）を断片ごとに固定する。
-    # 合成後の ConvertTo-DiffHtml だけを見ていると、どの断片が原因かが分からない
+    # 証跡のフォルダを別のマシンにコピーしても表示が崩れないことが要件のため、
+    # 外部を参照しないこと（CSS も JavaScript も埋め込む）を部品ごとに確認する。
+    # 結合後の ConvertTo-DiffHtml だけを確認すると、どの部品が原因かが分からないため。
 
     It "ペインは左右で別のクラスになる" {
         InModuleScope TextDiff {
-            # 左右が同じだと横スクロールの同期が片側にしか効かない
+            # 左右が同じだと、横スクロールの同期が片側にしか適用されないため。
             $rows = @(Get-DiffAlignment -BeforeLines @('a') -AfterLines @('b'))
 
             $left = Get-DiffHtmlPane -Rows $rows -Side 'left'
@@ -28,7 +28,7 @@ Describe "Get-DiffHtmlPane" {
         }
     }
 
-    It "ペインは指定した側の内容を出す" {
+    It "ペインは指定した側の内容を出力する" {
         InModuleScope TextDiff {
             $rows = @(Get-DiffAlignment -BeforeLines @('alpha') -AfterLines @('beta'))
 
@@ -37,7 +37,7 @@ Describe "Get-DiffHtmlPane" {
         }
     }
 
-    It "行が無くてもペインを組み立てられる" {
+    It "行が無くてもペインを生成できる" {
         InModuleScope TextDiff {
             { Get-DiffHtmlPane -Rows @() -Side 'left' } | Should -Not -Throw
         }

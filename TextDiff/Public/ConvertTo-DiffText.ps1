@@ -1,42 +1,26 @@
 ﻿#Requires -Version 5.1
 
-# 対応づけの結果を、コンソールに出す形へ変換する処理。
-#
-# 【なぜ文字列ではなく構造を返すか】
-# 行内の変わった部分だけ色を変えるため、1 行を「断片の並び」として渡す必要がある。
-# 文字列にしてしまうと、どこを別の色にすべきかの情報が失われる。
-# 出力（Write-Host）は呼び出し側が行う。ここは表示内容を決めるだけに留めることで、
-# テストがコンソール出力の捕捉ではなく、ただのデータ比較で済む。
-# 畳んだ行の文言（「N 行省略」など）も呼び出し側が作る。ここは行数だけを返す。
-# 文言と色は使う側の画面の決まりに合わせるものなので、このモジュールは持たない。
-#
-# 【なぜ文脈行を絞るか】
-# 変わっていない行をすべて前後に並べる形は、数十行の定義なら読みやすいが、
-# 1000 行のデータのうち 5 行が変わっただけで 995 行の文脈が流れると、
-# 差分の行だけを出すより読みにくくなる。
-# git diff と同じく前後数行に絞り、離れた変更の間は「N 行省略」で畳む。
-#
-# HTML 側（ConvertTo-DiffHtml）は畳まない。あちらはスクロールできるうえ、
-# 証跡としては全体が残っている方がよいため。読む人も目的も違う。
 function ConvertTo-DiffText {
     <#
     .SYNOPSIS
-        対応づけの結果を、コンソール表示用の行の並びに変換する。
+        対応付けの結果を、コンソール表示用の行に変換する。
     .DESCRIPTION
-        1 行は「行番号などの見出し（Gutter）」と「本文の断片（Segments）」で構成されます。
-        断片は行内の差分で分かれており、Changed が立っている断片だけ別の色で表示します。
+        各行は、行番号とマーカーの見出し（Gutter）と、本文の断片（Segments）で構成されます。
+        断片は行内の変更箇所で分割されており、Changed が $true の断片を別の色で表示できます。
 
-        変更のある行の前後 ContextLine 行だけを残し、それ以外は 1 行の省略表示に畳みます。
+        変更行の前後 ContextLine 行だけを残し、それ以外は 1 行の省略行にまとめます。
+
+        コンソールへの出力はしません。表示の色と、省略行の文言（「N 行省略」など）は呼び出し側で決めます。
     .PARAMETER Rows
-        Get-DiffAlignment が返す行の対応づけ（TextDiff.DiffRow の配列）。それ以外は受け付けません。
+        Get-DiffAlignment が返す行の対応付け（TextDiff.DiffRow の配列）。それ以外は受け付けません。
     .PARAMETER ContextLine
-        変更のある行の前後に残す、変わっていない行の数（0〜100）。
+        変更行の前後に残す、共通行の数（0〜100）。
     .OUTPUTS
         TextDiff.TextLine。次の項目を持つ [PSCustomObject] の配列です。
             Gutter       = '   6- '  行番号とマーカー
             Role         = 'Removed' | 'Added' | 'Context' | 'Omitted'
             Segments     = TextDiff.Segment（[PSCustomObject]@{ Text; Changed }）の配列
-            OmittedCount = 畳んだ行数。Omitted 以外の行では 0
+            OmittedCount = 省略した行数。Omitted 以外の行では 0
         Segments の Text を連結すると、元の行に一致します。Omitted の行だけは Segments が空です。
     .EXAMPLE
         PS> $rows = Get-DiffAlignment -BeforeLines @('name varchar(100),') -AfterLines @('name varchar(20),')
@@ -49,7 +33,7 @@ function ConvertTo-DiffText {
         >>     Write-Host
         >> }
 
-        削除側と追加側の 2 行を出し、行内で変わった部分（100 と 20）だけを黄色にします。
+        削除行と追加行の 2 行を表示し、変更箇所（100 と 20）だけを黄色にします。
     #>
     [CmdletBinding()]
     [OutputType('TextDiff.TextLine')]
@@ -62,7 +46,9 @@ function ConvertTo-DiffText {
     if ($Rows.Count -eq 0) { return $output.ToArray() }
 
     # --- 表示する行を決める ---
-    # 変更のある行から ContextLine 以内の距離にある行だけを残す
+    # 変更行から ContextLine 行以内の行だけを残す。1000 行のうち 5 行の変更で 995 行の文脈を表示すると、
+    # 差分が読みにくくなるため（git diff と同じ方式）。
+    # ConvertTo-DiffHtml は証跡として全体を残すため、行を省略しない。
     $keep = New-Object -TypeName 'bool[]' -ArgumentList $Rows.Count
     for ($rowIndex = 0; $rowIndex -lt $Rows.Count; $rowIndex++) {
         if ($Rows[$rowIndex].Kind -ceq 'Same') { continue }
@@ -71,8 +57,8 @@ function ConvertTo-DiffText {
         for ($keepIndex = $from; $keepIndex -le $to; $keepIndex++) { $keep[$keepIndex] = $true }
     }
 
-    # --- 行番号の桁を揃える ---
-    # 途中で桁が変わると行がガタつき、差分そのものより目に付く
+    # --- 行番号の桁数を揃える ---
+    # 途中で桁数が変わると行の位置がずれ、差分より目立つため。
     $maxNo = 0
     foreach ($row in $Rows) {
         foreach ($no in @($row.LeftNo, $row.RightNo)) {
@@ -84,7 +70,7 @@ function ConvertTo-DiffText {
     $index = 0
     while ($index -lt $Rows.Count) {
         if (-not $keep[$index]) {
-            # 連続する非表示行をまとめて 1 行に畳む
+            # 連続する非表示行を、1 行の省略行にまとめる。
             $start = $index
             while ($index -lt $Rows.Count -and -not $keep[$index]) { $index++ }
             $output.Add((ConvertTo-DiffTextLine -Gutter ('  ' + ('.' * $noWidth) + '  ') -Role 'Omitted' -OmittedCount ($index - $start)))
@@ -97,7 +83,7 @@ function ConvertTo-DiffText {
                 $output.Add((ConvertTo-DiffTextLine -Gutter (Format-DiffGutter -Number $row.RightNo -Marker ' ' -Width $noWidth) -Role 'Context' -Text $row.Right))
             }
             'Changed' {
-                # 行内のどこが変わったかを求め、削除側と追加側の 2 行に分けて出す
+                # 行内の変更箇所を求め、削除行と追加行の 2 行として出力する。
                 $inline = Get-InlineDiff -Left $row.Left -Right $row.Right
                 $output.Add((ConvertTo-DiffTextLine -Gutter (Format-DiffGutter -Number $row.LeftNo -Marker '-' -Width $noWidth) -Role 'Removed' -Segments $inline.Left))
                 $output.Add((ConvertTo-DiffTextLine -Gutter (Format-DiffGutter -Number $row.RightNo -Marker '+' -Width $noWidth) -Role 'Added' -Segments $inline.Right))

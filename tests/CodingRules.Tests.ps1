@@ -3,11 +3,11 @@
 # tools/PSScriptAnalyzerRules/CodingRules.psm1（書き方の決まりのカスタムルール）のテスト。
 #
 # 決まりそのものの検査は PSScriptAnalyzer が行う（CI の lint ジョブと、VS Code の PowerShell 拡張）。
-# ここでは、各ルールが違反を見つけ、決まりを守った書き方は見逃すことを確かめる。
-# ルールが壊れて何も見つけなくなると、リポジトリ全体の検査が無条件に通るため。
+# ここでは、各ルールが違反を検出し、決まりを守った書き方は検出しないことを確認する。
+# ルールが壊れて何も検出しなくなると、リポジトリ全体の検査が無条件に成功するため。
 #
-# 各ルールには、違反の行と守った行を並べた短いスクリプトを渡し、指摘の出た行番号を比べる。
-# スクリプトはファイルに書いて -Path で渡す。-ScriptDefinition で渡すと、同じ指摘が 2 回ずつ返る。
+# 各ルールに、違反の行と決まりを守った行を並べた短いスクリプトを渡し、指摘された行番号を比較する。
+# スクリプトはファイルに書き出して -Path で渡す。-ScriptDefinition で渡すと、同じ指摘が 2 回ずつ返る。
 
 BeforeAll {
     Set-StrictMode -Version 3.0
@@ -18,11 +18,11 @@ BeforeAll {
     function script:Get-FindingLine {
         <#
         .SYNOPSIS
-            1 つのルールだけを動かし、指摘の出た行番号を返す。
+            1 つのルールだけを実行し、指摘された行番号を返す。
         .PARAMETER Rule
             ルール名（Measure- を除いた部分）。
         .PARAMETER Line
-            検査させるスクリプトの行。
+            検査するスクリプトの行。
         #>
         param(
             [Parameter(Mandatory)] [string]$Rule,
@@ -38,8 +38,8 @@ BeforeAll {
 Describe "設定ファイル" {
 
     It "カスタムルールと既定のルールの両方を読み込む" {
-        # 読み込みに失敗すると、指摘が 0 件のまま黙って通る。
-        # 相対パスはカレントフォルダから解決されるので、CI と同じくリポジトリの直下で動かす
+        # カスタムルールの読み込みに失敗すると、指摘が 0 件のまま成功する。
+        # 相対パスはカレントフォルダから解決されるため、CI と同じくリポジトリの直下で実行する。
         $probePath = Join-Path -Path $TestDrive -ChildPath 'settings-probe.ps1'
         [System.IO.File]::WriteAllText($probePath, "`$left -eq `$right`ngci`n", [System.Text.UTF8Encoding]::new($true))
         Push-Location -LiteralPath $script:repoRoot
@@ -57,7 +57,7 @@ Describe "設定ファイル" {
 
 Describe "カスタムルール" {
 
-    It "AvoidLineContinuation: バッククォートの行継続を見つける" {
+    It "AvoidLineContinuation: バッククォートの行継続を検出する" {
         Get-FindingLine -Rule AvoidLineContinuation -Line @(
             'Get-Item -Path x `'
             '    -Force'
@@ -66,7 +66,7 @@ Describe "カスタムルール" {
         ) | Should -BeExactly @(1)
     }
 
-    It "AvoidSingleLetterVariable: 1 文字の変数を見つけ、自動変数は見逃す" {
+    It "AvoidSingleLetterVariable: 1 文字の変数名を検出し、自動変数は検出しない" {
         Get-FindingLine -Rule AvoidSingleLetterVariable -Line @(
             '$p = 1'
             '$name = 1'
@@ -74,14 +74,14 @@ Describe "カスタムルール" {
         ) | Should -BeExactly @(1)
     }
 
-    It "AvoidBoolParameter: [bool] の引数を見つけ、[switch] は見逃す" {
+    It "AvoidBoolParameter: [bool] の引数を検出し、[switch] は検出しない" {
         Get-FindingLine -Rule AvoidBoolParameter -Line @(
             'function Test-Flag { param([bool]$Flag) }'
             'function Test-Switch { param([switch]$Flag) }'
         ) | Should -BeExactly @(1)
     }
 
-    It "AvoidPositionalArgument: 位置で渡した引数を見つける" {
+    It "AvoidPositionalArgument: 位置指定の引数を検出する" {
         Get-FindingLine -Rule AvoidPositionalArgument -Line @(
             'function Test-Probe { param([string]$Key, [switch]$Flag, [string]$Other) }'
             'Test-Probe -Flag positional'
@@ -93,30 +93,30 @@ Describe "カスタムルール" {
         ) | Should -BeExactly @(2, 4, 4)
     }
 
-    It "AvoidPositionalArgument: TextDiff の非公開の関数の引数も引く" {
-        # テストは InModuleScope の中で非公開の関数を呼ぶ。Get-Command では引けないので、ソースから読む
+    It "AvoidPositionalArgument: TextDiff の非公開の関数の引数も取得する" {
+        # テストは InModuleScope の中で非公開の関数を呼び出す。Get-Command では取得できないため、ソースから読み取る。
         Get-FindingLine -Rule AvoidPositionalArgument -Line @(
             'Get-LineSimilarity $left $right'
             'Get-LineSimilarity -Left $left -Right $right'
         ) | Should -BeExactly @(1, 1)
     }
 
-    It "FormatOperatorInMethodArgument: 括弧の無い -f を見つける" {
+    It "FormatOperatorInMethodArgument: 括弧で囲んでいない -f を検出する" {
         Get-FindingLine -Rule FormatOperatorInMethodArgument -Line @(
             '$list.Add("{0} {1}" -f $first, $second)'
             '$list.Add(("{0} {1}" -f $first, $second))'
         ) | Should -BeExactly @(1)
     }
 
-    It "AvoidStartProcess: Start-Process を見つける" {
+    It "AvoidStartProcess: Start-Process を検出する" {
         Get-FindingLine -Rule AvoidStartProcess -Line @(
             'Start-Process -FilePath powershell.exe'
             '& powershell.exe -NoProfile -Command "1"'
         ) | Should -BeExactly @(1)
     }
 
-    It "StandaloneScriptHeader: #Requires とヘルプの無いスクリプトを見つける" {
-        # param() が 3 行目にあるので、#Requires とヘルプが無いという指摘は 3 行目に出る
+    It "StandaloneScriptHeader: #Requires とヘルプの無いスクリプトを検出する" {
+        # param() が 3 行目にあるため、#Requires とヘルプが無いという指摘は 3 行目に出る。
         Get-FindingLine -Rule StandaloneScriptHeader -Line @(
             '# 説明だけ'
             ''
@@ -124,7 +124,7 @@ Describe "カスタムルール" {
         ) | Should -BeExactly @(3, 3)
     }
 
-    It "StandaloneScriptHeader: 決まりどおりのスクリプトは見逃す" {
+    It "StandaloneScriptHeader: 決まりどおりのスクリプトは検出しない" {
         Get-FindingLine -Rule StandaloneScriptHeader -Line @(
             '#Requires -Version 5.1'
             ''
@@ -138,7 +138,7 @@ Describe "カスタムルール" {
         ) | Should -BeNullOrEmpty
     }
 
-    It "ImplicitCaseComparison: c も i も付けていない比較を見つける" {
+    It "ImplicitCaseComparison: c も i も付けていない比較演算子を検出する" {
         Get-FindingLine -Rule ImplicitCaseComparison -Line @(
             '$name -eq ''prd'''
             '$count -eq 0'
@@ -150,7 +150,7 @@ Describe "カスタムルール" {
         ) | Should -BeExactly @(1, 5, 6)
     }
 
-    It "InexactShouldOperator: 大小文字を区別しない Should の比較を見つける" {
+    It "InexactShouldOperator: 大文字と小文字を区別しない Should の比較を検出する" {
         Get-FindingLine -Rule InexactShouldOperator -Line @(
             '$value | Should -Be ''x'''
             '$value | Should -BeExactly ''x'''

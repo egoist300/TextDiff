@@ -3,7 +3,7 @@
 function Get-DiffHtmlScript {
     <#
     .SYNOPSIS
-        左右のペインのスクロール位置を合わせる JavaScript を返す。
+        左右のペインのスクロール位置を同期する JavaScript を返す。
     .OUTPUTS
         [string]
     #>

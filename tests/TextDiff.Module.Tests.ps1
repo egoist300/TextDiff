@@ -1,9 +1,9 @@
 ﻿#Requires -Version 5.1
 
-# TextDiff モジュールとして正しく組み上がっているかのテスト。
+# TextDiff モジュール全体の構成のテスト。
 #
-# 他のテストは関数ごとの振る舞いを見る。
-# ここはそれでは見えないもの、**モジュールとして読み込んだときにだけ起きること**と、ファイルの置き方を見る。
+# ほかのテストは関数ごとの動作を確認する。
+# ここでは、モジュールとして読み込んだときにだけ起きることと、ファイルの配置を確認する。
 
 BeforeAll {
     Set-StrictMode -Version 3.0
@@ -49,12 +49,12 @@ Describe "TextDiff モジュール" {
 
     Context "マニフェスト" {
 
-        It "Test-ModuleManifest を通る" {
+        It "Test-ModuleManifest の検証に成功する" {
             { Test-ModuleManifest -Path $script:manifestPath -ErrorAction Stop } | Should -Not -Throw
         }
 
         It "公開するものはワイルドカードを使わず列挙する" {
-            # * にすると、Private に関数を足しただけで公開範囲が広がる
+            # * にすると、Private に関数を追加しただけで公開範囲が広がるため。
             $data = Import-PowerShellDataFile -Path $script:manifestPath
 
             (@($data.FunctionsToExport) -ccontains '*') | Should -BeFalse
@@ -71,7 +71,7 @@ Describe "TextDiff モジュール" {
         }
 
         It "CHANGELOG.md に今の版の見出しがある" {
-            # Gallery に公開した版は上書きできない。何を変えた版なのかを先に書いておく
+            # PowerShell Gallery に公開した版は上書きできないため、変更内容を公開前に記載する。
             $version = (Import-PowerShellDataFile -Path $script:manifestPath).ModuleVersion
             $changelog = Get-Content -LiteralPath (Join-Path -Path $script:repoRoot -ChildPath 'CHANGELOG.md') -Raw -Encoding UTF8
 
@@ -83,7 +83,7 @@ Describe "TextDiff モジュール" {
 
         It "公開される関数は、Public に置いた関数とマニフェストの一覧に一致する" {
             # 置き場所と公開の一覧がずれると、Public にあるのに外から呼べない関数か、
-            # Private にあるのに公開される関数ができる
+            # Private にあるのに公開される関数ができるため。
             $inPublic = @(Get-SourceFile -Folder Public | ForEach-Object -MemberName BaseName | Sort-Object -CaseSensitive)
             $declared = @((Import-PowerShellDataFile -Path $script:manifestPath).FunctionsToExport | Sort-Object -CaseSensitive)
             $exported = @($script:module.ExportedFunctions.Keys | Sort-Object -CaseSensitive)
@@ -103,7 +103,7 @@ Describe "TextDiff モジュール" {
 
     Context "モジュールの中の実行条件" {
 
-        It "StrictMode が効いている" {
+        It "StrictMode が有効になっている" {
             $result = & $script:module { try { $null = $noSuchVariable; 'off' } catch { 'on' } }
 
             $result | Should -BeExactly 'on'
@@ -114,9 +114,9 @@ Describe "TextDiff モジュール" {
         }
 
         It "呼び出し元の ErrorActionPreference は変えない" {
-            # モジュールの設定が利用者のスクリプトに漏れると、利用者のエラー処理が変わってしまう。
-            # 漏れる経路はグローバルの変数だけなので、グローバルの値を直接見る。
-            # スクリプトのスコープで設定して読むと、グローバルが変わってもその変数が優先されて見えない
+            # モジュールの設定が利用者のスクリプトに漏れると、利用者のエラー処理が変わる。
+            # 漏れる経路はグローバル変数だけのため、グローバル変数の値を直接確認する。
+            # スクリプトのスコープで設定して読み取ると、グローバル変数が変わってもスクリプトの変数が優先され、検出できない。
             $probePath = Join-Path -Path $TestDrive -ChildPath 'probe.ps1'
             $probe = @"
 `$global:ErrorActionPreference = 'Continue'
@@ -133,19 +133,19 @@ Import-Module -Name '$script:manifestPath' -Force
         }
     }
 
-    Context "ファイルの置き方" {
+    Context "ファイルの配置" {
 
         It "リポジトリのすべてのスクリプト（.ps1 / .psm1）が、#Requires -Version 5.1 と空行で始まる" {
-            # 動作を確かめているのは Windows PowerShell 5.1 だけ。どのファイルから読み込まれても、
-            # 5.1 より古い版では書き方の違いで壊れる前に、版の不足として止まるようにする。
-            # 置き場所を先頭にそろえるのは、ファイルを開いてすぐ見えるようにするため。
-            # 空行を挟むのは、直後にヘルプを書くスクリプトで、Get-Help がヘルプを認識するため
+            # 動作を確認しているのは Windows PowerShell 5.1 だけ。どのファイルから読み込まれても、
+            # 5.1 より古い版では、構文の違いで失敗する前に、版の不足として停止させる。
+            # 先頭に置くのは、ファイルを開いてすぐ見えるようにするため。
+            # 空行を挟むのは、直後にヘルプを書くスクリプトで、Get-Help がヘルプを認識するため。
             $gitDir = (Join-Path -Path $script:repoRoot -ChildPath '.git') + [System.IO.Path]::DirectorySeparatorChar
             $scripts = @(Get-ChildItem -LiteralPath $script:repoRoot -File -Recurse -Force |
                     Where-Object -FilterScript { @('.ps1', '.psm1') -icontains $_.Extension -and -not $_.FullName.StartsWith($gitDir, [System.StringComparison]::OrdinalIgnoreCase) })
             $violations = foreach ($file in $scripts) {
                 $relativePath = $file.FullName.Substring($script:repoRoot.Length + 1)
-                # ReadAllText は先頭の BOM を取り除いて返す
+                # ReadAllText は先頭の BOM を除去して返す。
                 $lines = [System.IO.File]::ReadAllText($file.FullName, [System.Text.Encoding]::UTF8) -csplit "`n"
                 if ($lines.Count -lt 2 -or $lines[0] -cne '#Requires -Version 5.1' -or $lines[1] -cne '') {
                     "$relativePath（先頭の 2 行が「#Requires -Version 5.1」と空行ではない）"
@@ -185,7 +185,7 @@ Import-Module -Name '$script:manifestPath' -Force
         }
 
         It "すべてのテストファイルに、対応する関数か全体の検査がある" {
-            # 関数を消したのにテストだけ残ると、何を守っているのか分からないテストになる
+            # 関数を削除したのにテストだけ残ると、何を確認しているのか分からないテストになるため。
             $sourceNames = @(Get-SourceFile | ForEach-Object -MemberName BaseName)
             $wholeRepo = @('TextDiff.Module', 'FileEncoding', 'CommentBasedHelp', 'CodingRules')
             $orphans = @(Get-ChildItem -LiteralPath $script:testsRoot -Filter *.Tests.ps1 -File |
@@ -197,7 +197,7 @@ Import-Module -Name '$script:manifestPath' -Force
 
         It "モジュールのフォルダに *.Tests.ps1 が紛れ込んでも読み込まない" {
             # 本体は各フォルダの .ps1 をまとめて読み込むため、テストが紛れ込むと
-            # 利用者の環境でテストコードが展開される。リポジトリは汚さず、写した先で確かめる
+            # 利用者の環境でテストコードが展開される。リポジトリは変更せず、複製した先で確認する。
             $copyRoot = Join-Path -Path $TestDrive -ChildPath 'TextDiff'
             Copy-Item -LiteralPath $script:moduleRoot -Destination $copyRoot -Recurse
             $strayPath = Join-Path -Path $copyRoot -ChildPath 'Private\Stray.Tests.ps1'
@@ -213,9 +213,9 @@ Import-Module -Name '$script:manifestPath' -Force
         }
 
         It "角括弧を含むフォルダに置いても、関数をすべて読み込む" {
-            # -Path はワイルドカードとして解釈し、1 ファイルも見つけられない。
-            # 後始末は自分で -LiteralPath で行う。TestDrive の片付けは -Path で消すため、
-            # 角括弧のフォルダを残すと Pester 自身が落ちる
+            # -Path は角括弧をワイルドカードとして解釈し、1 ファイルも見つけられない。
+            # 後片付けは -LiteralPath で行う。TestDrive の後片付けは -Path で削除するため、
+            # 角括弧を含むフォルダを残すと Pester 自身が失敗する。
             $releaseRoot = Join-Path -Path $TestDrive -ChildPath 'release[2026]'
             New-Item -ItemType Directory -Path $releaseRoot -Force | Out-Null
             $copy = $null
