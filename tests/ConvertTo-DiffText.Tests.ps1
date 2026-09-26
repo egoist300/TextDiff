@@ -12,10 +12,22 @@ BeforeAll {
     Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\TextDiff\TextDiff.psd1') -Force
     InModuleScope TextDiff {
         function script:Get-Body {
+            <#
+            .SYNOPSIS
+                ConvertTo-DiffText の 1 行の断片を連結した本文を返す。
+            .PARAMETER Line
+                ConvertTo-DiffText が返した 1 行。
+            #>
             param($Line)
             return (($Line.Segments | ForEach-Object -Process { $_.Text }) -join '')
         }
         function script:Get-Marked {
+            <#
+            .SYNOPSIS
+                ConvertTo-DiffText の 1 行を、変わった断片を [] で囲んだ文字列にして返す。
+            .PARAMETER Line
+                ConvertTo-DiffText が返した 1 行。
+            #>
             param($Line)
             return (($Line.Segments | ForEach-Object -Process {
                         if ($_.Changed) { "[$($_.Text)]" } else { $_.Text }
@@ -23,6 +35,14 @@ BeforeAll {
         }
         # 30 行のうち指定した位置だけ桁を変えたデータを作る
         function script:New-TestRow {
+            <#
+            .SYNOPSIS
+                指定した位置の行だけ桁を変えたデータを作り、Get-DiffAlignment の結果を返す。
+            .PARAMETER Count
+                行数。
+            .PARAMETER ChangeAt
+                桁を変える行の添字（0 始まり）の一覧。
+            #>
             param([int]$Count = 30, [int[]]$ChangeAt = @())
             $before = New-Object -TypeName 'string[]' -ArgumentList $Count
             for ($lineIndex = 0; $lineIndex -lt $Count; $lineIndex++) { $before[$lineIndex] = "    column_{0:D2} character varying(100)," -f $lineIndex }

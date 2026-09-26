@@ -15,6 +15,10 @@
         NOTE: 添字の中で算術をするときは必ず括弧で囲むこと。
               $furthest[$slot + 1] は問題ないが、$table[$row + 1, $column] は PowerShell では
               $table[$row + (1, $column)] と解釈され、配列の連結になって落ちる。
+    .PARAMETER Left
+        before の行 ID の並び（ConvertTo-LineId の Left）。空の配列も受け取ります。
+    .PARAMETER Right
+        after の行 ID の並び（ConvertTo-LineId の Right）。空の配列も受け取ります。
     .OUTPUTS
         [System.Collections.Generic.List[hashtable]]
         @{ Kind = 'Same'|'Deleted'|'Added'; LeftIndex = before の添字 or $null; RightIndex = after の添字 or $null }

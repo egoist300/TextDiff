@@ -9,6 +9,8 @@
     .PARAMETER Rows
         Get-DiffAlignment が返す行の対応づけ。Kind / LeftNo / RightNo / Left / Right を持つ
         ハッシュテーブルの配列です。
+    .PARAMETER Side
+        組み立てる側。'left' なら before、'right' なら after の行を並べます。
     .OUTPUTS
         [string]
     #>

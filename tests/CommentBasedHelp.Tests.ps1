@@ -8,17 +8,33 @@ BeforeAll {
     Set-StrictMode -Version 3.0
     $script:repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path
 
-    # 公開する関数は Get-Help で読む人がいるので、引数の記載と使用例を必須にする。
-    # 非公開の関数は、型で中身が分からない引数だけ必須にする（CLAUDE.md の「Comment-based help」）
+    # すべての関数（テストの補助関数と、関数の中で定義した関数を含む）で、ヘルプと引数の記載を必須にする。
+    # 公開する関数は Get-Help で読む人がいるので、使用例も必須にする
     function Get-PublicSourceFile {
+        <#
+        .SYNOPSIS
+            公開する関数のファイルを返す。
+        #>
         Get-ChildItem -LiteralPath (Join-Path -Path $script:repoRoot -ChildPath 'TextDiff\Public') -Filter *.ps1 -File -ErrorAction Stop
     }
 
-    function Get-PrivateSourceFile {
-        Get-ChildItem -LiteralPath (Join-Path -Path $script:repoRoot -ChildPath 'TextDiff\Private') -Filter *.ps1 -File -ErrorAction Stop
+    function Get-RepositoryScriptFile {
+        <#
+        .SYNOPSIS
+            リポジトリの中の .ps1 をすべて返す（.git の中を除く）。
+        #>
+        $gitDir = (Join-Path -Path $script:repoRoot -ChildPath '.git') + [System.IO.Path]::DirectorySeparatorChar
+        Get-ChildItem -LiteralPath $script:repoRoot -Filter *.ps1 -File -Recurse -Force -ErrorAction Stop |
+            Where-Object -FilterScript { $_.Extension -ieq '.ps1' -and -not $_.FullName.StartsWith($gitDir, [System.StringComparison]::OrdinalIgnoreCase) }
     }
 
     function Get-FileAst {
+        <#
+        .SYNOPSIS
+            ファイルを構文解析し、構文木を返す。
+        .PARAMETER Path
+            解析する .ps1 のパス。
+        #>
         param([string]$Path)
         $tokens = $null
         $errors = $null
@@ -28,7 +44,18 @@ BeforeAll {
     # ヘルプが記載しているパラメータ名と、実際の param() を突き合わせる。
     # 引数名は PowerShell の名前なので、大小文字を区別せずに比べる
     function Get-HelpMismatch {
-        # RequireComplete: 実在する引数がすべて記載されていることまで求めるか
+        <#
+        .SYNOPSIS
+            ヘルプの .PARAMETER と実際の param() の食い違いを、1 件 1 行の説明で返す。
+        .PARAMETER HelpContent
+            FunctionDefinitionAst.GetHelpContent() の戻り値。ヘルプが無い関数では $null。
+        .PARAMETER ParamBlock
+            関数の ParamBlockAst。引数を取らない関数では $null。
+        .PARAMETER Label
+            食い違いの説明の先頭に付ける、関数を示す文字列。
+        .PARAMETER RequireComplete
+            実在する引数がすべて記載されていることまで求める。
+        #>
         param($HelpContent, $ParamBlock, [string]$Label, [switch]$RequireComplete)
 
         $found = [System.Collections.Generic.List[string]]::new()
@@ -56,10 +83,13 @@ BeforeAll {
 
 Describe "コメントベースヘルプと実装の対応" {
 
-    It "公開する関数の .PARAMETER と param() が一致する" {
-        $violations = foreach ($file in Get-PublicSourceFile) {
-            foreach ($function in (Get-FileAst -Path $file.FullName).FindAll($script:functionAstFilter, $false)) {
-                Get-HelpMismatch -HelpContent $function.GetHelpContent() -ParamBlock $function.Body.ParamBlock -Label "$($file.Name)/$($function.Name)" -RequireComplete
+    It "すべての関数にヘルプがあり、.PARAMETER と param() が一致する" {
+        $violations = foreach ($file in Get-RepositoryScriptFile) {
+            foreach ($function in (Get-FileAst -Path $file.FullName).FindAll($script:functionAstFilter, $true)) {
+                $label = "$($file.Name)/$($function.Name)"
+                $help = $function.GetHelpContent()
+                if ($null -eq $help -or [string]::IsNullOrWhiteSpace($help.Synopsis)) { "$label : ヘルプ（.SYNOPSIS）が無い" }
+                Get-HelpMismatch -HelpContent $help -ParamBlock $function.Body.ParamBlock -Label $label -RequireComplete
             }
         }
 
@@ -79,48 +109,9 @@ Describe "コメントベースヘルプと実装の対応" {
         (@($violations) -join "`n") | Should -BeNullOrEmpty
     }
 
-    It "非公開の関数は、実在しない引数を書いていない" {
-        # 引数を消したのにヘルプだけ残ると、消えた理由を探す手間になる
-        $violations = foreach ($file in Get-PrivateSourceFile) {
-            foreach ($function in (Get-FileAst -Path $file.FullName).FindAll($script:functionAstFilter, $true)) {
-                Get-HelpMismatch -HelpContent $function.GetHelpContent() -ParamBlock $function.Body.ParamBlock -Label "$($file.Name)/$($function.Name)"
-            }
-        }
-
-        (@($violations) -join "`n") | Should -BeNullOrEmpty
-    }
-
-    It "非公開の関数は、型で中身が分からない引数を記載している" {
-        # 名前と型と検証属性で伝わる引数には書かない。ただしハッシュテーブルや配列、型なしの引数は、
-        # どんなキーや要素を持つのかが param() から読めないので書く。
-        # 関数の中で定義した関数は見ない。呼び出しがすべて数行先にあり、たどる必要が無い
-        $shapelessTypes = @('hashtable', 'PSCustomObject', 'psobject', 'array', 'object', 'object[]')
-        $violations = foreach ($file in Get-PrivateSourceFile) {
-            foreach ($function in (Get-FileAst -Path $file.FullName).FindAll($script:functionAstFilter, $false)) {
-                if ($null -eq $function.Body.ParamBlock) { continue }
-                $help = $function.GetHelpContent()
-                $documented = @()
-                if ($null -ne $help -and $null -ne $help.Parameters) { $documented = @($help.Parameters.Keys) }
-
-                foreach ($parameter in $function.Body.ParamBlock.Parameters) {
-                    $typeNames = @($parameter.Attributes |
-                            Where-Object -FilterScript { $_ -is [System.Management.Automation.Language.TypeConstraintAst] } |
-                            ForEach-Object -Process { $_.TypeName.FullName })
-                    $shapelessTypeNames = @($typeNames | Where-Object -FilterScript { $shapelessTypes -icontains $_ })
-                    if ($typeNames.Count -gt 0 -and $shapelessTypeNames.Count -eq 0) { continue }
-
-                    $name = $parameter.Name.VariablePath.UserPath
-                    if ($documented -inotcontains $name) { "$($file.Name)/$($function.Name) : '$name' の中身が書かれていない" }
-                }
-            }
-        }
-
-        (@($violations) -join "`n") | Should -BeNullOrEmpty
-    }
-
     It "検査対象が 0 件になっていない" {
         # 対象の取り方を壊すと、この Describe が無条件に通る
         @(Get-PublicSourceFile).Count | Should -BeExactly 3
-        @(Get-PrivateSourceFile).Count | Should -BeGreaterThan 10
+        @(Get-RepositoryScriptFile).Count | Should -BeGreaterThan 30
     }
 }

@@ -26,8 +26,8 @@ heading before tagging.
 
 ## Comment-based help
 
-Public functions document every parameter and have at least one `.EXAMPLE`. Private functions
-document a parameter only when its type doesn't show what to pass (hashtable, array, untyped).
+Every function, including test helpers and functions defined inside functions, has help that
+documents every parameter. Public functions also have at least one `.EXAMPLE`.
 `tests/CommentBasedHelp.Tests.ps1` enforces both.
 
 ## Case in string comparisons

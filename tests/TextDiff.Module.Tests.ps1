@@ -11,6 +11,12 @@ BeforeAll {
     $script:testsRoot = Join-Path -Path $script:repoRoot -ChildPath 'tests'
 
     function Get-SourceFile {
+        <#
+        .SYNOPSIS
+            モジュールの関数のファイルを返す。
+        .PARAMETER Folder
+            対象のフォルダ名（Private / Public）の一覧。
+        #>
         param([string[]]$Folder = @('Private', 'Public'))
         foreach ($folderName in $Folder) {
             Get-ChildItem -LiteralPath (Join-Path -Path $script:moduleRoot -ChildPath $folderName) -Filter *.ps1 -File -ErrorAction Stop
@@ -18,6 +24,12 @@ BeforeAll {
     }
 
     function Get-FileAst {
+        <#
+        .SYNOPSIS
+            ファイルを構文解析し、構文木を返す。
+        .PARAMETER Path
+            解析する .ps1 のパス。
+        #>
         param([string]$Path)
         return [System.Management.Automation.Language.Parser]::ParseFile($Path, [ref]$null, [ref]$null)
     }
@@ -43,7 +55,7 @@ Describe "TextDiff モジュール" {
             # * にすると、Private に関数を足しただけで公開範囲が広がる
             $data = Import-PowerShellDataFile -Path $script:manifestPath
 
-            @($data.FunctionsToExport) | Should -Not -Contain '*'
+            (@($data.FunctionsToExport) -ccontains '*') | Should -BeFalse
             @($data.CmdletsToExport).Count | Should -BeExactly 0
             @($data.VariablesToExport).Count | Should -BeExactly 0
             @($data.AliasesToExport).Count | Should -BeExactly 0
@@ -112,7 +124,9 @@ Import-Module -Name '$script:manifestPath' -Force
             [System.IO.File]::WriteAllText($probePath, $probe, ([System.Text.UTF8Encoding]::new($true)))
 
             $output = @(powershell -NoProfile -Command "& '$probePath'" | ForEach-Object -Process { "$_" })
+            $probeExitCode = $LASTEXITCODE
 
+            $probeExitCode | Should -BeExactly 0
             $output | Should -BeExactly @('Continue')
         }
     }

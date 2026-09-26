@@ -83,7 +83,17 @@ function ConvertTo-DiffText {
     $noWidth = [Math]::Max(3, ([string]$maxNo).Length)
 
     function Format-Gutter {
-        param($Number, [string]$Marker, [int]$Width)
+        <#
+        .SYNOPSIS
+            行番号とマーカーを、桁を揃えた見出しにする。
+        .PARAMETER Number
+            行番号。反対側にしか無い行では $null で、その桁を空白で埋める。
+        .PARAMETER Marker
+            '-'（削除側）、'+'（追加側）、' '（文脈行）のいずれか。
+        .PARAMETER Width
+            行番号の桁数。
+        #>
+        param([Nullable[int]]$Number, [string]$Marker, [int]$Width)
         $text = if ($null -ne $Number) { ([string]$Number).PadLeft($Width) } else { ' ' * $Width }
         return "  $text$Marker "
     }

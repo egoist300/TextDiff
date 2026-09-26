@@ -15,12 +15,30 @@ BeforeAll {
     Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\TextDiff\TextDiff.psd1') -Force
     InModuleScope TextDiff {
         function script:New-Section {
+            <#
+            .SYNOPSIS
+                ConvertTo-DiffHtml に渡すセクションを 1 つ作る。
+            .PARAMETER Label
+                セクションの見出し。
+            .PARAMETER Before
+                変更前の行の並び。
+            .PARAMETER After
+                変更後の行の並び。
+            #>
             param([string]$Label = 'テーブル定義', [string[]]$Before, [string[]]$After)
             return @{ Label = $Label; Rows = @(Get-DiffAlignment -BeforeLines $Before -AfterLines $After) }
         }
 
         # ペインごとの <tr> の数を数える
         function script:Get-RowCount {
+            <#
+            .SYNOPSIS
+                HTML の片側のペインにある行（<tr>）の数を返す。ペインが無ければ -1。
+            .PARAMETER Html
+                ConvertTo-DiffHtml が返した HTML。
+            .PARAMETER Side
+                数えるペイン（'left' か 'right'）。
+            #>
             param([string]$Html, [string]$Side)
             $paneStart = $Html.IndexOf("<div class=""pane $Side"">", [System.StringComparison]::Ordinal)
             if ($paneStart -lt 0) { return -1 }

@@ -24,6 +24,12 @@ BeforeAll {
 
     # .git の中はリポジトリの管理情報で、規約の対象外
     function Get-TargetFile {
+        <#
+        .SYNOPSIS
+            リポジトリの中から、指定した拡張子のファイルを返す。
+        .PARAMETER Extension
+            対象の拡張子（小文字、ドット付き）の一覧。
+        #>
         param([string[]]$Extension)
         $gitDir = (Join-Path -Path $script:repoRoot -ChildPath '.git') + [System.IO.Path]::DirectorySeparatorChar
         Get-ChildItem -LiteralPath $script:repoRoot -File -Recurse -Force |
@@ -32,12 +38,24 @@ BeforeAll {
     }
 
     function Test-Utf8Bom {
+        <#
+        .SYNOPSIS
+            ファイルの先頭 3 バイトが UTF-8 の BOM（EF BB BF）かを返す。
+        .PARAMETER Path
+            調べるファイルのパス。
+        #>
         param([string]$Path)
         $bytes = [System.IO.File]::ReadAllBytes($Path)
         return ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
     }
 
     function Get-RelativePath {
+        <#
+        .SYNOPSIS
+            リポジトリの直下からの相対パスを返す。失敗したときに、どのファイルかを一目で分かるようにする。
+        .PARAMETER Path
+            リポジトリの中のファイルの完全パス。
+        #>
         param([string]$Path)
         return $Path.Substring($script:repoRoot.Length).TrimStart([System.IO.Path]::DirectorySeparatorChar)
     }

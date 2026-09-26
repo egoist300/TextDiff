@@ -16,6 +16,12 @@ BeforeAll {
     InModuleScope TextDiff {
         # 対応づけの結果を "種類:左行番号>右行番号" の並びに畳んで比較しやすくする
         function script:Get-Shape {
+            <#
+            .SYNOPSIS
+                対応づけの結果を「種類:左の行番号>右の行番号」の並びにして、期待値と比べやすくする。
+            .PARAMETER Rows
+                Get-DiffAlignment が返した行の対応づけ。
+            #>
             param([array]$Rows)
             return ($Rows | ForEach-Object -Process {
                     "{0}:{1}>{2}" -f $_.Kind,

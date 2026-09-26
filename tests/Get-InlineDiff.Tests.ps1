@@ -13,6 +13,12 @@ BeforeAll {
     InModuleScope TextDiff {
         # 変更部分を [] で囲んだ文字列にして、期待値を目で読める形にする
         function script:Get-Marked {
+            <#
+            .SYNOPSIS
+                断片の並びを、変わった断片を [] で囲んだ文字列にして返す。
+            .PARAMETER Segments
+                Get-InlineDiff が返した片側の断片。
+            #>
             param([array]$Segments)
             return (($Segments | ForEach-Object -Process {
                         if ($_.Changed) { "[$($_.Text)]" } else { $_.Text }
@@ -20,6 +26,12 @@ BeforeAll {
         }
 
         function script:Get-Joined {
+            <#
+            .SYNOPSIS
+                断片の並びを連結した文字列を返す。
+            .PARAMETER Segments
+                Get-InlineDiff が返した片側の断片。
+            #>
             param([array]$Segments)
             return (($Segments | ForEach-Object -Process { $_.Text }) -join '')
         }

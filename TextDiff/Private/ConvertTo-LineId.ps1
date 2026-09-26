@@ -9,6 +9,10 @@
 
         比較は大小文字を区別します（PostgreSQL の識別子は小文字に畳み込まれますが、
         データやクォート識別子では大小文字が意味を持つため）。
+    .PARAMETER Left
+        before の行の並び。空の配列と空行を含められます。
+    .PARAMETER Right
+        after の行の並び。空の配列と空行を含められます。Left と同じ内容の行には同じ ID を振ります。
     .OUTPUTS
         [hashtable] @{ Left = [int[]]; Right = [int[]] }
     #>

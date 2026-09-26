@@ -98,4 +98,4 @@ jobs:
           Publish-PSResource -Path .\TextDiff -Repository LocalCheck
           $package = @(Get-ChildItem -LiteralPath $localRepository -Filter 'TextDiff.*.nupkg')
           if ($package.Count -ne 1) { throw "Expected one TextDiff package but found $($package.Count)" }
-          Write-Host "Packaged: $($package[0].Name)"
+          Write-Host -Object "Packaged: $($package[0].Name)"

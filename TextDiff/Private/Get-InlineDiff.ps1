@@ -39,6 +39,12 @@ function Get-InlineDiff {
         中央のトークン数が MaxToken を超える場合は、中央をまとめて
         「変わった部分」として返します。行の中がほぼ全面的に違うということなので、
         細かく示しても読めるものにならず、計算時間だけがかかるためです。
+    .PARAMETER Left
+        書き換え前の行。空文字も受け取ります。
+    .PARAMETER Right
+        書き換え後の行。空文字も受け取ります。
+    .PARAMETER MaxToken
+        中央を細かく比べるトークン数の上限。どちらかの側が超えたら、中央をまとめて変更扱いにします。
     .OUTPUTS
         [hashtable] @{
             Left  = @( @{ Text = '...'; Changed = $false }, ... )
