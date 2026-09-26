@@ -1,16 +1,18 @@
-﻿# ConvertTo-LineId のテスト。
+﻿#Requires -Version 5.1
+
+# ConvertTo-LineId のテスト。
 
 BeforeAll {
-    # テストのコード自身も StrictMode 3.0 で動かす。モジュールの中は TextDiff.psm1 が設定している
+    # テストのコード自身も StrictMode 3.0 で実行する。モジュールの中は TextDiff.psm1 が設定する。
     Set-StrictMode -Version 3.0
-    # テスト対象はモジュールとして読み込み、テストの中身はモジュールの中（InModuleScope）で動かす。
-    # 非公開の関数はモジュールの中からしか呼べない。ファイルごとに読み直すので、前のファイルが置いた関数は残らない
+    # テスト対象はモジュールとして読み込み、テストはモジュールの中（InModuleScope）で実行する。
+    # 非公開の関数はモジュールの中からしか呼び出せない。ファイルごとに読み込み直すため、前のファイルが定義した関数は残らない。
     Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\TextDiff\TextDiff.psd1') -Force
 }
 
 Describe "ConvertTo-LineId" {
 
-    It "同じ内容の行には同じIDを割り当てる" {
+    It "同じ内容の行には同じ ID を割り当てる" {
         InModuleScope TextDiff {
             $ids = ConvertTo-LineId -Left @('a', 'b', 'a') -Right @('b', 'a')
 
@@ -22,8 +24,7 @@ Describe "ConvertTo-LineId" {
 
     It "大文字と小文字を区別する" {
         InModuleScope TextDiff {
-            # PostgreSQL のデータやクォート識別子では大小文字が意味を持つ。
-            # 同一視すると「変わっていないのに変わった」「変わったのに気づかない」の両方が起きる
+            # データでは大文字と小文字の違いも変更に当たる。同一視すると変更を見落とすため。
             $ids = ConvertTo-LineId -Left @('Alice') -Right @('alice')
 
             $ids.Left[0] | Should -Not -BeExactly $ids.Right[0]

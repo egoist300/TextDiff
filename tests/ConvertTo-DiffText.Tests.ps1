@@ -1,28 +1,49 @@
-﻿# コンソール表示用の変換のテスト。
+﻿#Requires -Version 5.1
+
+# ConvertTo-DiffText のテスト。
 #
-# 守りたいのは 2 点。
-#   ・1000 行のスナップショットで数行だけ変わったとき、画面が文脈行で埋まらないこと
-#   ・行内の変わった部分が、別の色を当てられる形で分かれていること
+# 重視するのは次の 2 点。
+#   ・1000 行のうち数行だけ変更されたとき、画面が文脈行で埋まらないこと。
+#   ・行内の変更箇所が、別の色で表示できる断片に分割されていること。
 
 BeforeAll {
-    # テストのコード自身も StrictMode 3.0 で動かす。モジュールの中は TextDiff.psm1 が設定している
+    # テストのコード自身も StrictMode 3.0 で実行する。モジュールの中は TextDiff.psm1 が設定する。
     Set-StrictMode -Version 3.0
-    # テスト対象はモジュールとして読み込み、テストの中身はモジュールの中（InModuleScope）で動かす。
-    # 非公開の関数はモジュールの中からしか呼べない。ファイルごとに読み直すので、前のファイルが置いた関数は残らない
+    # テスト対象はモジュールとして読み込み、テストはモジュールの中（InModuleScope）で実行する。
+    # 非公開の関数はモジュールの中からしか呼び出せない。ファイルごとに読み込み直すため、前のファイルが定義した関数は残らない。
     Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\TextDiff\TextDiff.psd1') -Force
     InModuleScope TextDiff {
         function script:Get-Body {
+            <#
+            .SYNOPSIS
+                ConvertTo-DiffText の 1 行の断片を連結した本文を返す。
+            .PARAMETER Line
+                ConvertTo-DiffText が返した 1 行。
+            #>
             param($Line)
             return (($Line.Segments | ForEach-Object -Process { $_.Text }) -join '')
         }
         function script:Get-Marked {
+            <#
+            .SYNOPSIS
+                ConvertTo-DiffText の 1 行を、変更箇所の断片を [] で囲んだ文字列に変換して返す。
+            .PARAMETER Line
+                ConvertTo-DiffText が返した 1 行。
+            #>
             param($Line)
             return (($Line.Segments | ForEach-Object -Process {
                         if ($_.Changed) { "[$($_.Text)]" } else { $_.Text }
                     }) -join '')
         }
-        # 30 行のうち指定した位置だけ桁を変えたデータを作る
         function script:New-TestRow {
+            <#
+            .SYNOPSIS
+                指定した位置の行だけ桁数を変更したデータを作成し、Get-DiffAlignment の結果を返す。
+            .PARAMETER Count
+                行数。
+            .PARAMETER ChangeAt
+                桁数を変更する行の添字（0 始まり）の配列。
+            #>
             param([int]$Count = 30, [int[]]$ChangeAt = @())
             $before = New-Object -TypeName 'string[]' -ArgumentList $Count
             for ($lineIndex = 0; $lineIndex -lt $Count; $lineIndex++) { $before[$lineIndex] = "    column_{0:D2} character varying(100)," -f $lineIndex }
@@ -35,34 +56,33 @@ BeforeAll {
 
 Describe "ConvertTo-DiffText" {
 
-    Context "文脈行の絞り込み" {
+    Context "文脈行の省略" {
 
-        It "変更から離れた行を省略表示にまとめる" {
+        It "変更行から離れた行を省略行にまとめる" {
             InModuleScope TextDiff {
-                # データは 1000 行を超えることもある。全部の文脈行を出すと
-                # 差分の行だけを出すより読みにくくなる
+                # データは 1000 行を超えることもある。すべての文脈行を表示すると、差分が読みにくくなるため。
                 $lines = @(ConvertTo-DiffText -Rows (New-TestRow -Count 30 -ChangeAt @(3)) -ContextLine 3)
 
                 @($lines | Where-Object -FilterScript { $_.Role -ceq 'Omitted' }).Count | Should -BeExactly 1
-                # 変更2行 + 前後の文脈 + 省略1行。30 行がそのまま出ることはない
+                # 変更 2 行、前後の文脈行、省略行 1 行。30 行すべてを表示することはない。
                 $lines.Count | Should -BeLessThan 15
             }
         }
 
         It "省略した行数を返し、文言は持たない" {
             InModuleScope TextDiff {
-                # 「何行飛ばしたか」が分からないと、見えていない部分の量が掴めない。
-                # 文言は呼び出し側がカタログから作る（差分エンジンはカタログを使わない）
+                # 省略した行数が分からないと、表示されていない部分の量を把握できないため。
+                # 省略行の文言は呼び出し側が作成する。
                 $lines = @(ConvertTo-DiffText -Rows (New-TestRow -Count 30 -ChangeAt @(3)) -ContextLine 3)
                 $omitted = $lines | Where-Object -FilterScript { $_.Role -ceq 'Omitted' }
 
-                # 変更は 4 行目。前後 3 行を残すと 1〜7 行目が見え、8〜30 行目の 23 行を畳む
+                # 変更は 4 行目。前後 3 行を残すと 1〜7 行目を表示し、8〜30 行目の 23 行を省略する。
                 $omitted.OmittedCount | Should -BeExactly 23
                 @($omitted.Segments).Count | Should -BeExactly 0
             }
         }
 
-        It "変更が離れて2箇所あれば、その間だけを畳む" {
+        It "変更が 2 か所に離れていれば、その間だけを省略する" {
             InModuleScope TextDiff {
                 $lines = @(ConvertTo-DiffText -Rows (New-TestRow -Count 30 -ChangeAt @(3, 20)) -ContextLine 3)
 
@@ -71,7 +91,7 @@ Describe "ConvertTo-DiffText" {
             }
         }
 
-        It "ContextLine が 0 なら文脈行を出さない" {
+        It "ContextLine が 0 なら文脈行を表示しない" {
             InModuleScope TextDiff {
                 $lines = @(ConvertTo-DiffText -Rows (New-TestRow -Count 30 -ChangeAt @(3)) -ContextLine 0)
 
@@ -79,7 +99,7 @@ Describe "ConvertTo-DiffText" {
             }
         }
 
-        It "変更が無ければ全体が省略表示になる" {
+        It "変更が無ければ全体が省略行になる" {
             InModuleScope TextDiff {
                 $lines = @(ConvertTo-DiffText -Rows (New-TestRow -Count 10) -ContextLine 3)
 
@@ -94,9 +114,9 @@ Describe "ConvertTo-DiffText" {
         }
     }
 
-    Context "行の見せ方" {
+    Context "行の表示形式" {
 
-        It "書き換えは削除行と追加行の2行になる" {
+        It "変更行は削除行と追加行の 2 行になる" {
             InModuleScope TextDiff {
                 $rows = @(Get-DiffAlignment -BeforeLines @('    name character varying(100),') -AfterLines @('    name character varying(20),'))
                 $lines = @(ConvertTo-DiffText -Rows $rows)
@@ -107,9 +127,9 @@ Describe "ConvertTo-DiffText" {
             }
         }
 
-        It "書き換えの行内で、変わった部分だけが分かれている" {
+        It "変更行の行内で、変更箇所だけが別の断片に分割される" {
             InModuleScope TextDiff {
-                # ここが分かれていないと、行全体が同じ色になり強調できない
+                # 断片に分割されていないと、行全体が同じ色になり、変更箇所を強調できないため。
                 $rows = @(Get-DiffAlignment -BeforeLines @('    name character varying(100),') -AfterLines @('    name character varying(20),'))
                 $lines = @(ConvertTo-DiffText -Rows $rows)
 
@@ -118,9 +138,9 @@ Describe "ConvertTo-DiffText" {
             }
         }
 
-        It "対にならない削除・追加は行内強調を付けない" {
+        It "対応付けていない削除行と追加行は強調しない" {
             InModuleScope TextDiff {
-                # 別物なので、どこが変わったという話にならない
+                # 別の行のため、行内の変更箇所は無い。
                 $rows = @(Get-DiffAlignment -BeforeLines @('    status_code character(2),') -AfterLines @('    email text,'))
                 $lines = @(ConvertTo-DiffText -Rows $rows)
 
@@ -129,7 +149,7 @@ Describe "ConvertTo-DiffText" {
             }
         }
 
-        It "見出しに行番号とマーカーが入る" {
+        It "見出しに行番号とマーカーが含まれる" {
             InModuleScope TextDiff {
                 $rows = @(Get-DiffAlignment -BeforeLines @('a', 'b') -AfterLines @('a', 'c'))
                 $lines = @(ConvertTo-DiffText -Rows $rows)
@@ -141,22 +161,22 @@ Describe "ConvertTo-DiffText" {
             }
         }
 
-        It "行番号の桁を揃える" {
+        It "行番号の桁数を統一する" {
             InModuleScope TextDiff {
-                # 途中で桁が変わると行がガタつき、差分より目に付いてしまう
+                # 途中で桁数が変化すると行の位置がずれ、差分より目立つため。
                 $rows = @(New-TestRow -Count 120 -ChangeAt @(5, 100))
                 $lines = @(ConvertTo-DiffText -Rows $rows -ContextLine 1)
                 $gutters = @($lines | Where-Object -FilterScript { $_.Role -cne 'Omitted' } | ForEach-Object -Process { $_.Gutter.Length })
 
-                # NOTE: @() で囲むこと。Select-Object -Unique の結果が1件だと
-                #       スカラーに展開され、StrictMode 下で .Count が落ちる
+                # NOTE: @() で囲むこと。Select-Object -Unique の結果が 1 件だとスカラーに展開され、
+                #       StrictMode では .Count が例外になる。
                 @($gutters | Select-Object -Unique).Count | Should -BeExactly 1
             }
         }
 
-        It "本文を連結すると元の行に戻る" {
+        It "本文を連結すると元の行と一致する" {
             InModuleScope TextDiff {
-                # ずれると強調が別の場所に付く
+                # 連結結果が元の行と一致しないと、強調が別の位置に付くため。
                 $rows = @(Get-DiffAlignment -BeforeLines @('    name character varying(100),') -AfterLines @('    name character varying(20),'))
                 $lines = @(ConvertTo-DiffText -Rows $rows)
 
@@ -168,7 +188,7 @@ Describe "ConvertTo-DiffText" {
 
     Context "新規作成・削除" {
 
-        It "before が空なら全て追加行になる" {
+        It "変更前が空なら、すべて追加行になる" {
             InModuleScope TextDiff {
                 $rows = @(Get-DiffAlignment -BeforeLines @() -AfterLines @('a', 'b'))
                 $lines = @(ConvertTo-DiffText -Rows $rows)
@@ -177,12 +197,50 @@ Describe "ConvertTo-DiffText" {
             }
         }
 
-        It "after が空なら全て削除行になる" {
+        It "変更後が空なら、すべて削除行になる" {
             InModuleScope TextDiff {
                 $rows = @(Get-DiffAlignment -BeforeLines @('a', 'b') -AfterLines @())
                 $lines = @(ConvertTo-DiffText -Rows $rows)
 
                 @($lines | Where-Object -FilterScript { $_.Role -ceq 'Removed' }).Count | Should -BeExactly 2
+            }
+        }
+    }
+
+    Context "戻り値の型" {
+
+        It "行は TextDiff.TextLine、断片は TextDiff.Segment の PSCustomObject で返す" {
+            InModuleScope TextDiff {
+                $lines = @(ConvertTo-DiffText -Rows (New-TestRow -Count 30 -ChangeAt @(3)) -ContextLine 3)
+
+                foreach ($line in $lines) {
+                    $line -is [System.Management.Automation.PSCustomObject] | Should -BeTrue
+                    $line.PSObject.TypeNames[0] | Should -BeExactly 'TextDiff.TextLine'
+                    foreach ($segment in @($line.Segments)) {
+                        $segment -is [System.Management.Automation.PSCustomObject] | Should -BeTrue
+                        $segment.PSObject.TypeNames[0] | Should -BeExactly 'TextDiff.Segment'
+                    }
+                }
+            }
+        }
+
+        It "すべての行が同じ項目を持ち、省略行以外の OmittedCount は 0" {
+            InModuleScope TextDiff {
+                # 行ごとに項目が異なると、Format-Table の列が最初の行で決まり、
+                # StrictMode では存在しない項目の参照が例外になるため。
+                $lines = @(ConvertTo-DiffText -Rows (New-TestRow -Count 30 -ChangeAt @(3)) -ContextLine 3)
+
+                foreach ($line in $lines) {
+                    (@($line.PSObject.Properties | ForEach-Object -Process { $_.Name }) -join ',') | Should -BeExactly 'Gutter,Role,Segments,OmittedCount'
+                    if ($line.Role -cne 'Omitted') { $line.OmittedCount | Should -BeExactly 0 }
+                }
+            }
+        }
+
+        It "Get-DiffAlignment の結果ではないものは Rows に受け付けない" {
+            InModuleScope TextDiff {
+                # 形式の異なる入力を受け取ると、処理の途中で「項目が無い」という分かりにくいエラーになるため。
+                { ConvertTo-DiffText -Rows @(@{ Kind = 'Same'; LeftNo = 1; RightNo = 1; Left = 'a'; Right = 'a' }) } | Should -Throw
             }
         }
     }

@@ -1,24 +1,19 @@
-﻿function Get-MyersOperation {
+﻿#Requires -Version 5.1
+
+function Get-MyersOperation {
     <#
     .SYNOPSIS
-        Myers 法で編集操作の列（Same / Deleted / Added）を求める。
+        Myers 法で、変更前から変更後への最短の編集操作（Same / Deleted / Added）を算出する。
     .DESCRIPTION
-        整数IDの列同士を比較し、before から after へ変換する最短の編集操作を返します。
-        Changed（書き換え）の判定はここでは行いません。Myers が答えるのは
-        「どの行が共通か」までで、削除と追加を対にするかは別の判断だからです
-        （Get-DiffAlignment が担当）。
-
-        変数名と論文（Myers, "An O(ND) Difference Algorithm and Its Variations"）の記号の対応:
-          $leftLength = N / $rightLength = M / $editCount = D / $diagonal = k /
-          $leftPos = x / $rightPos = y / $furthest = V（対角線ごとの最も遠い x）
-
-        NOTE: 添字の中で算術をするときは必ず括弧で囲むこと。
-              $furthest[$slot + 1] は問題ないが、$table[$row + 1, $column] は PowerShell では
-              $table[$row + (1, $column)] と解釈され、配列の連結になって落ちる。
+        Changed（変更）の判定は行いません。削除行と追加行の対応付けは Get-DiffAlignment が行います。
+    .PARAMETER Left
+        変更前の行 ID の配列（ConvertTo-LineId の Left）。空の配列も受け取ります。
+    .PARAMETER Right
+        変更後の行 ID の配列（ConvertTo-LineId の Right）。空の配列も受け取ります。
     .OUTPUTS
         [System.Collections.Generic.List[hashtable]]
-        @{ Kind = 'Same'|'Deleted'|'Added'; LeftIndex = before の添字 or $null; RightIndex = after の添字 or $null }
-        の並び。before/after の先頭から末尾までを漏れなく覆います。
+        @{ Kind = 'Same'|'Deleted'|'Added'; LeftIndex = 変更前の添字 or $null; RightIndex = 変更後の添字 or $null }
+        の List。変更前と変更後のすべての要素を、先頭から順に 1 回ずつ含みます。
     #>
     [CmdletBinding()]
     [OutputType([System.Collections.Generic.List[hashtable]])]
@@ -31,7 +26,7 @@
     $rightLength = $Right.Length
     $ops = [System.Collections.Generic.List[hashtable]]::new()
 
-    # 片側が空なら Myers を回すまでもない
+    # 片側が空なら、Myers 法を実行する必要はない。
     if ($leftLength -eq 0 -and $rightLength -eq 0) { return $ops }
     if ($leftLength -eq 0) {
         for ($rightIndex = 0; $rightIndex -lt $rightLength; $rightIndex++) {
@@ -46,12 +41,17 @@
         return $ops
     }
 
+    # 変数名と論文（Myers, "An O(ND) Difference Algorithm and Its Variations"）の記号の対応:
+    #   $leftLength = N / $rightLength = M / $editCount = D / $diagonal = k /
+    #   $leftPos = x / $rightPos = y / $furthest = V（対角線ごとの最も遠い x）
+    # 添字の中の算術は必ず括弧で囲む。$table[$row + 1, $column] は $table[$row + (1, $column)] と解釈され、
+    # 配列の連結になって失敗する。
     $maxEditCount = $leftLength + $rightLength
     $size = 2 * $maxEditCount + 2
     $offset = $maxEditCount
     $furthest = New-Object -TypeName 'int[]' -ArgumentList $size
-    # 各段の V を保存する。これが無いと経路を復元できない。
-    # [Array]::Copy を使うこと（PowerShell のループで写すと D に比例して重くなる）
+    # 各段の V を保存する。保存しないと経路を復元できない。
+    # PowerShell のループで複製すると D に比例して遅くなるため、[Array]::Copy で複製する。
     $trace = [System.Collections.Generic.List[int[]]]::new()
 
     $shortestEditCount = -1
@@ -69,7 +69,7 @@
                 $leftPos = $furthest[($slot - 1)] + 1
             }
             $rightPos = $leftPos - $diagonal
-            # 一致が続く限り斜めに進む
+            # 一致が続く間、対角線方向に進む。
             while ($leftPos -lt $leftLength -and $rightPos -lt $rightLength -and $Left[$leftPos] -ceq $Right[$rightPos]) {
                 $leftPos++
                 $rightPos++

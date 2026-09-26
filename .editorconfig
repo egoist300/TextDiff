@@ -1,9 +1,3 @@
-# このリポジトリの文字コードと改行の規約を、エディタに伝えるための設定。
-#
-# 規約そのものは tests/FileEncoding.Tests.ps1 が検査している。ここはその代わりではなく、
-# **テストで落ちる前に、保存した時点で合わせる**ためのもの。
-# 拡張子ごとに BOM の要否が違うため、手で直すと間違えやすい。
-
 root = true
 
 [*]
@@ -13,20 +7,17 @@ indent_style = space
 trim_trailing_whitespace = true
 insert_final_newline = true
 
-# PowerShell が読み込むファイル（.ps1 / .psd1 / .psm1）は BOM 必須。BOM なしで保存すると、
-# 日本語ロケール環境ではコメントが文字化けし、スクリプトが起動しなくなる
+# BOM なしで保存すると、日本語ロケールの Windows PowerShell 5.1 ではコメントが文字化けし、スクリプト実行不可。
 [*.{ps1,psd1,psm1}]
 charset = utf-8-bom
 indent_size = 4
 
-# BOM を付けない。付けると .json は ConvertFrom-Json が、.yml は GitHub Actions の
-# 解析が壊れる。.sql は psql に渡す前提
-[*.{md,json,sql,yml,yaml,html}]
+[*.{md,json,yml,yaml,html}]
 charset = utf-8
 
 [*.{json,yml,yaml}]
 indent_size = 2
 
-# Markdown は行末の 2 スペースが改行の意味を持つので、行末の空白を消さない
+# Markdown は行末の 2 つの空白が改行を表すため、行末の空白を削除しない。
 [*.md]
 trim_trailing_whitespace = false

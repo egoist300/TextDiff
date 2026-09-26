@@ -1,19 +1,20 @@
-﻿function Get-DiffHtmlStyle {
+﻿#Requires -Version 5.1
+
+function Get-DiffHtmlStyle {
     <#
     .SYNOPSIS
-        埋め込む CSS を返す。
+        HTML に埋め込む CSS を返す。
     .DESCRIPTION
-        配色はコンソールと同じ考え方に揃えています。
-        削除はマゼンタ（赤にしない。削除は正常な結果であり、失敗と混同させない）、
-        追加は緑、行内で変わった部分はオレンジ。
-        ダークモードでも読めるよう、配色を二組用意しています。
+        削除行はマゼンタ、追加行は緑、変更箇所はオレンジ、比較できなかったセクション（Unverified）は赤で表示します。
+        ライトモードとダークモードの 2 種類の配色を用意しています。
     .OUTPUTS
-        [string]
+        [string] CSS。
     #>
     [CmdletBinding()]
     [OutputType([string])]
     param()
 
+    # 削除行を赤にしないのは、削除は正常な結果であり、失敗と混同させないため。赤は比較できなかったセクションだけに使う。
     return @'
   :root {
     --ground: #f6f8fa; --surface: #ffffff; --surface-alt: #eef2f6;

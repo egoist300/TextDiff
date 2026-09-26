@@ -1,26 +1,45 @@
-﻿# 横並べ HTML 出力のテスト。
+﻿#Requires -Version 5.1
+
+# ConvertTo-DiffHtml のテスト。
 #
-# 最も重視するのはエスケープ。スナップショットには COMMENT やデータがそのまま入り、
-# < > & が含まれることは普通にある。エスケープを忘れると表示が壊れるだけでなく、
-# 内容がタグとして解釈されて黙って消える。証跡が欠けるので正しさの問題として扱う。
+# 最も重視するのはエスケープ。比較する行には < > & が含まれることがあり、エスケープが漏れると
+# 表示が崩れるだけでなく、内容がタグとして解釈されて表示されない。
+# 差分の内容が欠落するため、正しさの問題として扱う。
 #
-# 次に、左右のペインの行数が揃っていること。揃わないと行が上下にずれ、
-# 横並べにした意味そのものが消える。
+# 次に重視するのは、左右のペインの行数が一致すること。一致しないと行が上下にずれ、
+# 左右を比較できない。
 
 BeforeAll {
-    # テストのコード自身も StrictMode 3.0 で動かす。モジュールの中は TextDiff.psm1 が設定している
+    # テストのコード自身も StrictMode 3.0 で実行する。モジュールの中は TextDiff.psm1 が設定する。
     Set-StrictMode -Version 3.0
-    # テスト対象はモジュールとして読み込み、テストの中身はモジュールの中（InModuleScope）で動かす。
-    # 非公開の関数はモジュールの中からしか呼べない。ファイルごとに読み直すので、前のファイルが置いた関数は残らない
+    # テスト対象はモジュールとして読み込み、テストはモジュールの中（InModuleScope）で実行する。
+    # 非公開の関数はモジュールの中からしか呼び出せない。ファイルごとに読み込み直すため、前のファイルが定義した関数は残らない。
     Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\TextDiff\TextDiff.psd1') -Force
     InModuleScope TextDiff {
         function script:New-Section {
-            param([string]$Label = 'テーブル定義', [string[]]$Before, [string[]]$After)
+            <#
+            .SYNOPSIS
+                ConvertTo-DiffHtml に渡すセクションを 1 つ作成する。
+            .PARAMETER Label
+                セクションの見出し。
+            .PARAMETER Before
+                変更前の行の配列。
+            .PARAMETER After
+                変更後の行の配列。
+            #>
+            param([string]$Label = 'アプリ設定', [string[]]$Before, [string[]]$After)
             return @{ Label = $Label; Rows = @(Get-DiffAlignment -BeforeLines $Before -AfterLines $After) }
         }
 
-        # ペインごとの <tr> の数を数える
         function script:Get-RowCount {
+            <#
+            .SYNOPSIS
+                HTML の片側のペインにある行（<tr>）の数を返す。ペインが無ければ -1。
+            .PARAMETER Html
+                ConvertTo-DiffHtml が返した HTML。
+            .PARAMETER Side
+                対象のペイン（'left' か 'right'）。
+            #>
             param([string]$Html, [string]$Side)
             $paneStart = $Html.IndexOf("<div class=""pane $Side"">", [System.StringComparison]::Ordinal)
             if ($paneStart -lt 0) { return -1 }
@@ -33,11 +52,11 @@ BeforeAll {
 
 Describe "ConvertTo-DiffHtml" {
 
-    Context "文書としての体裁" {
+    Context "HTML 文書の構成" {
 
         It "文字コードを宣言する" {
             InModuleScope TextDiff {
-                # 宣言が無いとブラウザの推測に委ねられ、日本語が化ける
+                # 宣言が無いと文字コードの判定がブラウザに任され、日本語が文字化けするため。
                 $html = ConvertTo-DiffHtml -Title 'T' -Sections @(New-Section -Before @('a') -After @('b'))
 
                 $html | Should -MatchExactly '<meta charset="utf-8">'
@@ -46,7 +65,7 @@ Describe "ConvertTo-DiffHtml" {
 
         It "CSS と JavaScript を埋め込む（外部を参照しない）" {
             InModuleScope TextDiff {
-                # 証跡フォルダを別のマシンにコピーしても表示が崩れないようにするため
+                # HTML ファイルを別のマシンにコピーしても、表示が崩れないようにするため。
                 $html = ConvertTo-DiffHtml -Title 'T' -Sections @(New-Section -Before @('a') -After @('b'))
 
                 $html | Should -MatchExactly '<style>'
@@ -67,13 +86,21 @@ Describe "ConvertTo-DiffHtml" {
 
         It "凡例を含める" {
             InModuleScope TextDiff {
-                # 証跡は差分ツールに慣れていない人も読む。色だけで意味を察してもらわない
+                # 差分ツールに慣れていない人も HTML を読むため、配色だけで意味が伝わる前提にしない。
                 $html = ConvertTo-DiffHtml -Title 'T' -Sections @(New-Section -Before @('a') -After @('b'))
 
                 $html | Should -MatchExactly '削除された行'
                 $html | Should -MatchExactly '追加された行'
-                $html | Should -MatchExactly '行内で変わった部分'
+                $html | Should -MatchExactly '行内の変更箇所'
                 $html | Should -MatchExactly '反対側に対応する行が無い'
+            }
+        }
+
+        It "左右のペインの見出しは、変更前と変更後" {
+            InModuleScope TextDiff {
+                $html = ConvertTo-DiffHtml -Title 'T' -Sections @(New-Section -Before @('a') -After @('b'))
+
+                $html | Should -MatchExactly '<div class="side"><div>変更前</div><div>変更後</div></div>'
             }
         }
     }
@@ -82,8 +109,7 @@ Describe "ConvertTo-DiffHtml" {
 
         It "データに含まれる HTML をタグとして解釈させない" {
             InModuleScope TextDiff {
-                # COMMENT や text 型の値に < > が入るのは普通にある。
-                # 素通しすると証跡が黙って消える
+                # 比較する行には < > が含まれることがある。エスケープしないと、内容がタグとして解釈されて表示されないため。
                 $html = ConvertTo-DiffHtml -Title 'T' -Sections @(
                     New-Section -Before @('remarks text, -- <script>alert(1)</script>') -After @('remarks text,')
                 )
@@ -93,7 +119,7 @@ Describe "ConvertTo-DiffHtml" {
             }
         }
 
-        It "書き換えた行の変わった部分を強調する" {
+        It "変更行の変更箇所を強調する" {
             InModuleScope TextDiff {
                 $html = ConvertTo-DiffHtml -Title 'T' -Sections @(
                     New-Section -Before @('    name character varying(100),') -After @('    name character varying(20),')
@@ -104,7 +130,7 @@ Describe "ConvertTo-DiffHtml" {
             }
         }
 
-        It "対にならない削除・追加には強調を付けない" {
+        It "対応付けていない削除行と追加行は強調しない" {
             InModuleScope TextDiff {
                 $html = ConvertTo-DiffHtml -Title 'T' -Sections @(
                     New-Section -Before @('    status_code character(2),') -After @('    email text,')
@@ -119,7 +145,7 @@ Describe "ConvertTo-DiffHtml" {
 
         It "左右の行数が一致する" {
             InModuleScope TextDiff {
-                # 揃わないと行が上下にずれ、横並べにした意味が消える
+                # 行数が一致しないと行が上下にずれ、左右を比較できないため。
                 $html = ConvertTo-DiffHtml -Title 'T' -Sections @(
                     New-Section -Before @('a', 'b', 'c', 'd') -After @('a', 'x', 'd', 'e', 'f')
                 )
@@ -131,7 +157,7 @@ Describe "ConvertTo-DiffHtml" {
             }
         }
 
-        It "反対側に無い行は空欄にする（斜線を当てるため）" {
+        It "反対側に無い行は空欄にする（斜線を表示するため）" {
             InModuleScope TextDiff {
                 $html = ConvertTo-DiffHtml -Title 'T' -Sections @(
                     New-Section -Before @('a') -After @('a', 'b')
@@ -141,9 +167,9 @@ Describe "ConvertTo-DiffHtml" {
             }
         }
 
-        It "行番号を出す" {
+        It "行番号を表示する" {
             InModuleScope TextDiff {
-                # 「どこの差分か」を位置で示す。行番号が無いと、差分の場所を元のファイルで探せない
+                # 行番号が無いと、差分の位置を元のファイルで特定できないため。
                 $html = ConvertTo-DiffHtml -Title 'T' -Sections @(
                     New-Section -Before @('a', 'b') -After @('a', 'c')
                 )
@@ -155,7 +181,7 @@ Describe "ConvertTo-DiffHtml" {
 
     Context "差分なし・検証不能" {
 
-        It "差分が無いセクションは (差分なし) と出す" {
+        It "差分が無いセクションは (差分なし) と表示する" {
             InModuleScope TextDiff {
                 $html = ConvertTo-DiffHtml -Title 'T' -Sections @(New-Section -Before @('a') -After @('a'))
 
@@ -164,12 +190,12 @@ Describe "ConvertTo-DiffHtml" {
             }
         }
 
-        It "検証不能のセクションは理由を出し、差分を出さない" {
+        It "検証不能のセクションは理由を表示し、差分を表示しない" {
             InModuleScope TextDiff {
-                # 「差分なし」と見分けが付かない表示にしてはならない。
-                # 何も検証できていない実行を「変更なし」と読ませるのが最悪の結果
+                # 「差分なし」と区別できない表示にしない。
+                # 検証できていない実行を「変更なし」と誤読させることが、最も避けるべき結果のため。
                 $html = ConvertTo-DiffHtml -Title 'T' -Sections @(
-                    @{ Label = 'テーブル定義'; Rows = @(); Unverified = @('!!! 検証不能: before の取得に失敗 !!!') }
+                    @{ Label = 'アプリ設定'; Rows = @(); Unverified = @('!!! 検証不能: before の取得に失敗 !!!') }
                 )
 
                 $html | Should -MatchExactly '検証不能'
@@ -191,24 +217,36 @@ Describe "ConvertTo-DiffHtml" {
 
     Context "複数セクション" {
 
-        It "セクションの数だけカードを作る" {
+        It "セクションの数だけカードを作成する" {
             InModuleScope TextDiff {
                 $html = ConvertTo-DiffHtml -Title 'T' -Sections @(
-                    New-Section -Label 'テーブル定義' -Before @('a') -After @('b')
-                    New-Section -Label 'カラム一覧' -Before @('c') -After @('d')
+                    New-Section -Label 'アプリ設定' -Before @('a') -After @('b')
+                    New-Section -Label '接続設定' -Before @('c') -After @('d')
                 )
 
                 ([regex]::Matches($html, 'class="card-head"')).Count | Should -BeExactly 2
-                $html | Should -MatchExactly 'テーブル定義'
-                $html | Should -MatchExactly 'カラム一覧'
+                $html | Should -MatchExactly 'アプリ設定'
+                $html | Should -MatchExactly '接続設定'
             }
         }
 
-        It "セクションが1つも無くても文書として成立する" {
+        It "セクションが 1 つも無くても HTML 文書として成立する" {
             InModuleScope TextDiff {
                 $html = ConvertTo-DiffHtml -Title 'T' -Sections @()
 
                 $html | Should -MatchExactly '</html>'
+            }
+        }
+    }
+
+    Context "受け付ける入力" {
+
+        It "Rows に Get-DiffAlignment の結果ではないものを渡すと失敗する" {
+            InModuleScope TextDiff {
+                # 差分の無い行（Same）だけでは行を出力しないため、出力時の型の検証を経由しない。関数の入口で拒否することを確認する。
+                $section = @{ Label = 'L'; Rows = @(@{ Kind = 'Same'; LeftNo = 1; RightNo = 1; Left = 'a'; Right = 'a' }) }
+
+                { ConvertTo-DiffHtml -Title 'T' -Sections @($section) } | Should -Throw -ExceptionType ([System.ArgumentException])
             }
         }
     }

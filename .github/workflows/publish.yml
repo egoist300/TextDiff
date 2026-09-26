@@ -1,12 +1,7 @@
 name: Publish
 
-# v1.2.3 の形のタグを push すると、テストを通したうえで PowerShell Gallery へ公開する。
-# 一度公開した版は上書きも削除もできない（一覧から隠すことだけができる）。
-#
-# 必要なもの: リポジトリの Secrets に PSGALLERY_API_KEY（PowerShell Gallery の API キー。
-# 対象のパッケージを TextDiff に絞り、公開（Push）の権限だけを与える）。
-#
-# run: の中に日本語を書かないこと（理由は ci.yml の冒頭）。
+# run: の中に日本語を書かない。runner は run: の内容を BOM なしの UTF-8 で一時 .ps1 に書き出し、
+# Windows PowerShell 5.1 はそれを ANSI コードページとして読むため、文字化けし、構文エラーになることもある。
 
 on:
   push:
@@ -27,6 +22,16 @@ jobs:
               Install-Module -Name Pester -Scope CurrentUser -Force -SkipPublisherCheck -RequiredVersion $want
           }
 
+      # tests/CodingRules.Tests.ps1 が、カスタムルールを実行して確認するため。
+      - name: Ensure PSScriptAnalyzer
+        shell: powershell
+        run: |
+          $want = [version]'1.25.0'
+          if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer | Where-Object -FilterScript { $_.Version -eq $want })) {
+              Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+              Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -RequiredVersion $want
+          }
+
       - name: Pester
         shell: powershell
         run: |
@@ -38,11 +43,11 @@ jobs:
   publish:
     needs: test
     runs-on: windows-latest
-    # 公開は Secrets を使うので、承認を挟みたくなったら environment を足す
+    # 公開には Secrets を使うため、承認の手順を追加する場合は environment を設定する。
     steps:
       - uses: actions/checkout@v7
 
-      # タグとマニフェストの版が違うまま公開すると、公開された版から元のコミットを辿れなくなる
+      # タグとマニフェストのバージョンが異なるまま公開すると、公開したバージョンから元のコミットを特定できなくなるため。
       - name: Check tag matches ModuleVersion
         shell: powershell
         run: |

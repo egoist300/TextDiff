@@ -1,15 +1,12 @@
 name: CI
 
-# Pester と PSScriptAnalyzer を、利用者と同じ Windows PowerShell 5.1 で回す。
-# shell: powershell が Windows PowerShell 5.1、pwsh は PowerShell 7 になる。
+# 利用者と同じ Windows PowerShell 5.1 で実行するため、shell: pwsh（PowerShell 7）ではなく shell: powershell を使う。
 #
-# 【run: の中に日本語を書かないこと】
-# GitHub Actions は run: の中身を BOM なしの一時 .ps1 に書き出し、Windows PowerShell 5.1 は
-# それを ANSI コードページとして読む。文字列リテラルに日本語を入れると構文エラーになりうる。
-# 説明はこの YAML コメント側に書く。
+# run: の中に日本語を書かない。runner は run: の内容を BOM なしの UTF-8 で一時 .ps1 に書き出し、
+# Windows PowerShell 5.1 はそれを ANSI コードページとして読むため、文字化けし、構文エラーになることもある。
 #
-# 使うモジュールの版は README.md の「開発」の表が正。各ジョブは自分が使うものだけを
-# -RequiredVersion で 1 点に固定する。範囲で指定すると、runner に同居している別の版が選ばれる。
+# モジュールのバージョンは、範囲で指定すると runner にインストール済みの別のバージョンが選ばれるため、
+# -RequiredVersion で 1 つのバージョンに固定する。
 
 on:
   push:
@@ -23,14 +20,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # runner の shell: powershell の実体が変わったときに気づくため
+      # runner の shell: powershell の実体が変更されたときに検出するため。
       - name: Check PowerShell version
         shell: powershell
         run: |
           if ($PSVersionTable.PSVersion.Major -ne 5) { throw "Expected Windows PowerShell 5.1 but got $($PSVersionTable.PSVersion)" }
 
-      # windows-latest に同梱されている版なら何もしない。版がずれたらインストールが走り、ログに出る。
-      # Windows 同梱の Pester 3.4.0 と署名者が異なるため -SkipPublisherCheck が要る
+      # windows-latest に同梱されているバージョンなら、何もしない。バージョンが異なればインストールし、ログに記録される。
+      # Windows 同梱の Pester 3.4.0 と署名者が異なるため、-SkipPublisherCheck が必要。
       - name: Ensure Pester
         shell: powershell
         run: |
@@ -38,6 +35,16 @@ jobs:
           if (-not (Get-Module -ListAvailable -Name Pester | Where-Object -FilterScript { $_.Version -eq $want })) {
               Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
               Install-Module -Name Pester -Scope CurrentUser -Force -SkipPublisherCheck -RequiredVersion $want
+          }
+
+      # tests/CodingRules.Tests.ps1 が、カスタムルールを実行して確認するため。
+      - name: Ensure PSScriptAnalyzer
+        shell: powershell
+        run: |
+          $want = [version]'1.25.0'
+          if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer | Where-Object -FilterScript { $_.Version -eq $want })) {
+              Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+              Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -RequiredVersion $want
           }
 
       - name: Pester
@@ -62,7 +69,7 @@ jobs:
               Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -RequiredVersion $want
           }
 
-      # 設定ファイルの Severity に ParseError を含めてあるため、構文エラーのあるファイルもここで落ちる
+      # 設定ファイルで Severity を指定していないため、構文エラー（ParseError）のあるファイルもここで失敗する。
       - name: PSScriptAnalyzer
         shell: powershell
         run: |
@@ -74,9 +81,9 @@ jobs:
               throw "$($findings.Count) finding(s) from PSScriptAnalyzer"
           }
 
-  # 公開と同じ手順で、runner の中のフォルダへ公開してみる。
-  # PowerShell Gallery へ公開するときに初めてマニフェストやパッケージの不備に気づくのを防ぐ。
-  # 手順は publish.yml と同じにしておくこと
+  # 公開と同じ手順で、runner の中のフォルダへ試験的に公開する。
+  # PowerShell Gallery への公開時に、初めてマニフェストやパッケージの不備が判明するのを防ぐため。
+  # 手順は publish.yml と同じにする。
   package:
     runs-on: windows-latest
     steps:
@@ -98,4 +105,4 @@ jobs:
           Publish-PSResource -Path .\TextDiff -Repository LocalCheck
           $package = @(Get-ChildItem -LiteralPath $localRepository -Filter 'TextDiff.*.nupkg')
           if ($package.Count -ne 1) { throw "Expected one TextDiff package but found $($package.Count)" }
-          Write-Host "Packaged: $($package[0].Name)"
+          Write-Host -Object "Packaged: $($package[0].Name)"

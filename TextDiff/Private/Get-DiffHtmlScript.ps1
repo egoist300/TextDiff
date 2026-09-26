@@ -1,7 +1,9 @@
-﻿function Get-DiffHtmlScript {
+﻿#Requires -Version 5.1
+
+function Get-DiffHtmlScript {
     <#
     .SYNOPSIS
-        左右のペインのスクロール位置を合わせる JavaScript を返す。
+        左右のペインのスクロール位置を同期する JavaScript を返す。
     .OUTPUTS
         [string]
     #>
@@ -10,7 +12,7 @@
     param()
 
     return @'
-// 左右のペインのスクロール位置を合わせる。
+// 左右のペインのスクロール位置を同期する。
 // 動かない環境でも各ペインは独立にスクロールできるため、閲覧自体は成立する。
 (function () {
   var panes = Array.prototype.slice.call(document.querySelectorAll('.pane'));

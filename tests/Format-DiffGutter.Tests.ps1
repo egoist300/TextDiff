@@ -1,6 +1,6 @@
 ﻿#Requires -Version 5.1
 
-# Get-DiffHtmlStyle のテスト。
+# Format-DiffGutter のテスト。
 
 BeforeAll {
     # テストのコード自身も StrictMode 3.0 で実行する。モジュールの中は TextDiff.psm1 が設定する。
@@ -10,21 +10,24 @@ BeforeAll {
     Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\TextDiff\TextDiff.psd1') -Force
 }
 
-Describe "Get-DiffHtmlStyle" {
+Describe "Format-DiffGutter" {
 
-    It "スタイルは外部ファイルを読み込まない" {
+    It "行番号を指定した桁数で右寄せし、マーカーを付ける" {
         InModuleScope TextDiff {
-            $style = Get-DiffHtmlStyle
-
-            $style | Should -Not -MatchExactly '@import'
-            $style | Should -Not -MatchExactly 'href\s*='
+            Format-DiffGutter -Number 6 -Marker '-' -Width 3 | Should -BeExactly '    6- '
         }
     }
 
-    It "スタイルは変更箇所の強調の色を定義する" {
+    It "行番号が無いときは、桁数分の空白を配置する" {
         InModuleScope TextDiff {
-            # 変更箇所を示すオレンジ。
-            Get-DiffHtmlStyle | Should -Not -BeNullOrEmpty
+            # 反対側にしか無い行でも、見出しの幅を統一するため。
+            Format-DiffGutter -Marker '+' -Width 3 | Should -BeExactly '     + '
+        }
+    }
+
+    It "桁数を超える行番号は切り詰めない" {
+        InModuleScope TextDiff {
+            Format-DiffGutter -Number 12345 -Marker ' ' -Width 3 | Should -BeExactly '  12345  '
         }
     }
 }
