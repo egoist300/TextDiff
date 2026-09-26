@@ -1,4 +1,6 @@
-﻿function Get-DiffHtmlScript {
+﻿#Requires -Version 5.1
+
+function Get-DiffHtmlScript {
     <#
     .SYNOPSIS
         左右のペインのスクロール位置を合わせる JavaScript を返す。

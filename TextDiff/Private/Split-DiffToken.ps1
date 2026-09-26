@@ -1,4 +1,6 @@
-﻿function Split-DiffToken {
+﻿#Requires -Version 5.1
+
+function Split-DiffToken {
     <#
     .SYNOPSIS
         1 行を、行内比較の単位（トークン）へ分割する。

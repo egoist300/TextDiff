@@ -1,4 +1,6 @@
-﻿function Get-DiffHtmlStyle {
+﻿#Requires -Version 5.1
+
+function Get-DiffHtmlStyle {
     <#
     .SYNOPSIS
         埋め込む CSS を返す。

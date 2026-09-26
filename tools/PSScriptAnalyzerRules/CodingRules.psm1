@@ -1,4 +1,6 @@
-﻿# 書き方の決まり（~/.claude/rules/powershell.md）を、PSScriptAnalyzer のカスタムルールとして検査する。
+﻿#Requires -Version 5.1
+
+# 書き方の決まり（~/.claude/rules/powershell.md）を、PSScriptAnalyzer のカスタムルールとして検査する。
 #
 # PSScriptAnalyzerSettings.psd1 の CustomRulePath から読み込まれる。CI の lint ジョブと、
 # VS Code の PowerShell 拡張（ワークスペース直下の設定ファイルを自動で拾う）の両方で動くため、

@@ -1,4 +1,6 @@
-﻿# TextDiff モジュールとして正しく組み上がっているかのテスト。
+﻿#Requires -Version 5.1
+
+# TextDiff モジュールとして正しく組み上がっているかのテスト。
 #
 # 他のテストは関数ごとの振る舞いを見る。
 # ここはそれでは見えないもの、**モジュールとして読み込んだときにだけ起きること**と、ファイルの置き方を見る。
@@ -132,6 +134,23 @@ Import-Module -Name '$script:manifestPath' -Force
     }
 
     Context "ファイルの置き方" {
+
+        It "リポジトリのすべてのスクリプト（.ps1 / .psm1）が #Requires -Version 5.1 を宣言する" {
+            # 動作を確かめているのは Windows PowerShell 5.1 だけ。どのファイルから読み込まれても、
+            # 5.1 より古い版では書き方の違いで壊れる前に、版の不足として止まるようにする
+            $gitDir = (Join-Path -Path $script:repoRoot -ChildPath '.git') + [System.IO.Path]::DirectorySeparatorChar
+            $scripts = @(Get-ChildItem -LiteralPath $script:repoRoot -File -Recurse -Force |
+                    Where-Object -FilterScript { @('.ps1', '.psm1') -icontains $_.Extension -and -not $_.FullName.StartsWith($gitDir, [System.StringComparison]::OrdinalIgnoreCase) })
+            $violations = foreach ($file in $scripts) {
+                $requirements = (Get-FileAst -Path $file.FullName).ScriptRequirements
+                if ($null -eq $requirements -or $requirements.RequiredPSVersion -cne [version]'5.1') {
+                    $file.FullName.Substring($script:repoRoot.Length + 1)
+                }
+            }
+
+            $scripts.Count | Should -BeGreaterThan 30
+            (@($violations) -join ', ') | Should -BeNullOrEmpty
+        }
 
         It "Public と Private は 1 ファイル 1 関数で、ファイル名は関数名と同じ" {
             # 関数からファイルを名前だけで辿れる状態を保つ

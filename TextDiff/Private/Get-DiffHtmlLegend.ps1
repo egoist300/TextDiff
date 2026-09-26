@@ -1,4 +1,6 @@
-﻿function Get-DiffHtmlLegend {
+﻿#Requires -Version 5.1
+
+function Get-DiffHtmlLegend {
     <#
     .SYNOPSIS
         色の意味を示す凡例を返す。

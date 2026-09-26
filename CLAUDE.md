@@ -7,6 +7,8 @@ and the release procedure are in `README.md`.
 ## Conventions not visible in code
 
 - Target is Windows PowerShell 5.1 only. Run tests and lint in a fresh `powershell.exe -NoProfile`.
+- Every `.ps1` and `.psm1` starts with `#Requires -Version 5.1` and a blank line, including function
+  files and tests. `tests/TextDiff.Module.Tests.ps1` enforces it.
 - One function per file, file name = function name. `Public/` is exported and must match
   `FunctionsToExport`; everything else goes in `Private/`. Every function has `tests/<Name>.Tests.ps1`.
   `tests/TextDiff.Module.Tests.ps1` enforces these.

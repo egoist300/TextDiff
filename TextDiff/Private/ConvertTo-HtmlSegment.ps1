@@ -1,4 +1,6 @@
-﻿function ConvertTo-HtmlSegment {
+﻿#Requires -Version 5.1
+
+function ConvertTo-HtmlSegment {
     <#
     .SYNOPSIS
         断片の並びを、行内強調つきの HTML 断片へ変換する。

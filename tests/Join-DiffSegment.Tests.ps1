@@ -1,4 +1,6 @@
-﻿# Join-DiffSegment のテスト。
+﻿#Requires -Version 5.1
+
+# Join-DiffSegment のテスト。
 
 BeforeAll {
     # テストのコード自身も StrictMode 3.0 で動かす。モジュールの中は TextDiff.psm1 が設定している

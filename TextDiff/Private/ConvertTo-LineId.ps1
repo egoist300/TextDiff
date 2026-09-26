@@ -1,4 +1,6 @@
-﻿function ConvertTo-LineId {
+﻿#Requires -Version 5.1
+
+function ConvertTo-LineId {
     <#
     .SYNOPSIS
         before/after の行を整数IDに置き換える。

@@ -1,4 +1,6 @@
-﻿function Get-MyersOperation {
+﻿#Requires -Version 5.1
+
+function Get-MyersOperation {
     <#
     .SYNOPSIS
         Myers 法で編集操作の列（Same / Deleted / Added）を求める。

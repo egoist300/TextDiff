@@ -1,4 +1,6 @@
-﻿function Get-DiffHtmlPane {
+﻿#Requires -Version 5.1
+
+function Get-DiffHtmlPane {
     <#
     .SYNOPSIS
         片側（before または after）のペインを組み立てる。

@@ -1,4 +1,6 @@
-﻿# tools/PSScriptAnalyzerRules/CodingRules.psm1（書き方の決まりのカスタムルール）のテスト。
+﻿#Requires -Version 5.1
+
+# tools/PSScriptAnalyzerRules/CodingRules.psm1（書き方の決まりのカスタムルール）のテスト。
 #
 # 決まりそのものの検査は PSScriptAnalyzer が行う（CI の lint ジョブと、VS Code の PowerShell 拡張）。
 # ここでは、各ルールが違反を見つけ、決まりを守った書き方は見逃すことを確かめる。

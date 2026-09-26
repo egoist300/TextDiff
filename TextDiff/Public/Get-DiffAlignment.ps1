@@ -1,4 +1,6 @@
-﻿# before/after の行を対応づける処理。
+﻿#Requires -Version 5.1
+
+# before/after の行を対応づける処理。
 #
 # 【なぜ Compare-Object をやめるのか】
 # Compare-Object は集合の比較で、行の順序を持たない。答えられるのは

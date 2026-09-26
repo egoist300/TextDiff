@@ -1,4 +1,6 @@
-﻿function Get-LineSimilarity {
+﻿#Requires -Version 5.1
+
+function Get-LineSimilarity {
     <#
     .SYNOPSIS
         2 行がどれだけ似ているかを 0.0〜1.0 で返す。

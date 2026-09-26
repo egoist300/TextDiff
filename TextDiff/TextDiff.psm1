@@ -1,4 +1,6 @@
-﻿# TextDiff モジュールの読み込み係。関数はフォルダごとに置き、ここでは実行条件を整えて読み込むだけ。
+﻿#Requires -Version 5.1
+
+# TextDiff モジュールの読み込み係。関数はフォルダごとに置き、ここでは実行条件を整えて読み込むだけ。
 #
 #   Private\  非公開の関数。1 つの関数に 1 ファイルで、ファイル名は関数名と同じ
 #   Public\   公開する関数（TextDiff.psd1 の FunctionsToExport に列挙したもの）。置き方は Private\ と同じ

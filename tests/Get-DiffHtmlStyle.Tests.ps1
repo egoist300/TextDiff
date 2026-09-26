@@ -1,4 +1,6 @@
-﻿# Get-DiffHtmlStyle のテスト。
+﻿#Requires -Version 5.1
+
+# Get-DiffHtmlStyle のテスト。
 
 BeforeAll {
     # テストのコード自身も StrictMode 3.0 で動かす。モジュールの中は TextDiff.psm1 が設定している

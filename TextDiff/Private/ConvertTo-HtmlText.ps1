@@ -1,4 +1,6 @@
-﻿function ConvertTo-HtmlText {
+﻿#Requires -Version 5.1
+
+function ConvertTo-HtmlText {
     <#
     .SYNOPSIS
         HTML に埋め込む文字列をエスケープする。

@@ -1,4 +1,6 @@
-﻿function Join-DiffSegment {
+﻿#Requires -Version 5.1
+
+function Join-DiffSegment {
     <#
     .SYNOPSIS
         隣り合う同じ状態の断片をつなげ、利用者に返す断片（TextDiff.Segment）にする。
