@@ -91,19 +91,12 @@ function Get-InlineDiff {
     while ($tail -lt ($limit - $head) -and
         $allLeft[($allLeft.Count - 1 - $tail)] -ceq $allRight[($allRight.Count - 1 - $tail)]) { $tail++ }
 
-    # NOTE: 範囲の式は条件の中で評価すること。$allLeft[0..($head - 1)] を先に
-    #       評価してから上書きする書き方だと、$head = 0 のとき 0..-1 という
-    #       範囲になり、空配列に対して配列外参照で落ちる
-    #       （before が空＝オブジェクト新規作成時に実際に通る経路）
-    $prefix = ''
-    if ($head -gt 0) { $prefix = -join $allLeft[0..($head - 1)] }
-    $suffix = ''
-    if ($tail -gt 0) { $suffix = -join $allLeft[($allLeft.Count - $tail)..($allLeft.Count - 1)] }
-
-    $leftTokens = @()
-    if (($allLeft.Count - $head - $tail) -gt 0) { $leftTokens = @($allLeft[$head..($allLeft.Count - 1 - $tail)]) }
-    $rightTokens = @()
-    if (($allRight.Count - $head - $tail) -gt 0) { $rightTokens = @($allRight[$head..($allRight.Count - 1 - $tail)]) }
+    $leftList = [System.Collections.Generic.List[string]]::new([string[]]$allLeft)
+    $rightList = [System.Collections.Generic.List[string]]::new([string[]]$allRight)
+    $prefix = -join $leftList.GetRange(0, $head)
+    $suffix = -join $leftList.GetRange($leftList.Count - $tail, $tail)
+    $leftTokens = @($leftList.GetRange($head, $leftList.Count - $head - $tail))
+    $rightTokens = @($rightList.GetRange($head, $rightList.Count - $head - $tail))
 
     $leftSegments = [System.Collections.Generic.List[hashtable]]::new()
     $rightSegments = [System.Collections.Generic.List[hashtable]]::new()

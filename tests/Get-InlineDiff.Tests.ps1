@@ -154,6 +154,20 @@ Describe "Get-InlineDiff" {
             }
         }
 
+        It "行全体では上限を超えても、変わった部分が上限内なら細かく強調する" {
+            InModuleScope TextDiff {
+                # 上限は、共通の先頭・末尾を削った後の中央で判定する。
+                # 行全体で判定すると、長い行は 1 か所変わっただけで行ごと変更扱いになる
+                $left = ((1..60 | ForEach-Object -Process { "k$_" }) -join ',') + ',old,' + ((1..60 | ForEach-Object -Process { "t$_" }) -join ',')
+                $right = ((1..60 | ForEach-Object -Process { "k$_" }) -join ',') + ',new,' + ((1..60 | ForEach-Object -Process { "t$_" }) -join ',')
+
+                $diff = Get-InlineDiff -Left $left -Right $right -MaxToken 10
+
+                @(Split-DiffToken -Text $left).Count | Should -BeGreaterThan 10
+                @($diff.Left | Where-Object -FilterScript { $_.Changed } | ForEach-Object -Process { $_.Text }) | Should -BeExactly @('old')
+            }
+        }
+
         It "上限内なら細かく強調する" {
             InModuleScope TextDiff {
                 $left = 'HEAD,a1,KEEP,a2,TAIL'
