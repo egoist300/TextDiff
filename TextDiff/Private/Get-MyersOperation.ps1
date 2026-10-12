@@ -22,24 +22,31 @@ function Get-MyersOperation {
         [Parameter(Mandatory)] [AllowEmptyCollection()] [int[]]$Right
     )
 
-    $leftLength = $Left.Length
-    $rightLength = $Right.Length
-    $ops = [System.Collections.Generic.List[hashtable]]::new()
+    # --- 1. 相手側に一致が無い要素を除外する ---
+    # 相手側に一致が無い要素は、どの対応付けでも Same にならず、必ず Deleted か Added になる。
+    # 先に除外しても最短の編集の長さは変わらず、Myers 法の計算量だけが減る（GNU diffutils と同じ考え方）。
+    # 除外しないと、すべての要素が異なる 3000 要素同士で約 20 秒かかった（Windows PowerShell 5.1 での実測）。
+    # 残る要素は必ず相手側にも残る要素と一致するため、片側だけが空になることはない。
+    $leftSet = [System.Collections.Generic.HashSet[int]]::new($Left)
+    $rightSet = [System.Collections.Generic.HashSet[int]]::new($Right)
+    $keptLeft = [System.Collections.Generic.List[int]]::new()
+    $keptRight = [System.Collections.Generic.List[int]]::new()
+    for ($leftIndex = 0; $leftIndex -lt $Left.Length; $leftIndex++) {
+        if ($rightSet.Contains($Left[$leftIndex])) { $keptLeft.Add($leftIndex) }
+    }
+    for ($rightIndex = 0; $rightIndex -lt $Right.Length; $rightIndex++) {
+        if ($leftSet.Contains($Right[$rightIndex])) { $keptRight.Add($rightIndex) }
+    }
+    $leftIds = New-Object -TypeName 'int[]' -ArgumentList $keptLeft.Count
+    for ($keptIndex = 0; $keptIndex -lt $keptLeft.Count; $keptIndex++) { $leftIds[$keptIndex] = $Left[$keptLeft[$keptIndex]] }
+    $rightIds = New-Object -TypeName 'int[]' -ArgumentList $keptRight.Count
+    for ($keptIndex = 0; $keptIndex -lt $keptRight.Count; $keptIndex++) { $rightIds[$keptIndex] = $Right[$keptRight[$keptIndex]] }
 
-    # 片側が空なら、Myers 法を実行する必要はない。
-    if ($leftLength -eq 0 -and $rightLength -eq 0) { return $ops }
-    if ($leftLength -eq 0) {
-        for ($rightIndex = 0; $rightIndex -lt $rightLength; $rightIndex++) {
-            $ops.Add(@{ Kind = 'Added'; LeftIndex = $null; RightIndex = $rightIndex })
-        }
-        return $ops
-    }
-    if ($rightLength -eq 0) {
-        for ($leftIndex = 0; $leftIndex -lt $leftLength; $leftIndex++) {
-            $ops.Add(@{ Kind = 'Deleted'; LeftIndex = $leftIndex; RightIndex = $null })
-        }
-        return $ops
-    }
+    # --- 2. 残った要素を Myers 法で比較する ---
+    # 添字は残った要素の中での位置。両方とも空なら、手数 0 で終了する。
+    $leftLength = $leftIds.Length
+    $rightLength = $rightIds.Length
+    $keptOps = [System.Collections.Generic.List[hashtable]]::new()
 
     # 変数名と論文（Myers, "An O(ND) Difference Algorithm and Its Variations"）の記号の対応:
     #   $leftLength = N / $rightLength = M / $editCount = D / $diagonal = k /
@@ -70,7 +77,7 @@ function Get-MyersOperation {
             }
             $rightPos = $leftPos - $diagonal
             # 一致が続く間、対角線方向に進む。
-            while ($leftPos -lt $leftLength -and $rightPos -lt $rightLength -and $Left[$leftPos] -ceq $Right[$rightPos]) {
+            while ($leftPos -lt $leftLength -and $rightPos -lt $rightLength -and $leftIds[$leftPos] -ceq $rightIds[$rightPos]) {
                 $leftPos++
                 $rightPos++
             }
@@ -97,21 +104,45 @@ function Get-MyersOperation {
         $previousRightPos = $previousLeftPos - $previousDiagonal
 
         while ($leftPos -gt $previousLeftPos -and $rightPos -gt $previousRightPos) {
-            $ops.Add(@{ Kind = 'Same'; LeftIndex = ($leftPos - 1); RightIndex = ($rightPos - 1) })
+            $keptOps.Add(@{ Kind = 'Same'; LeftIndex = ($leftPos - 1); RightIndex = ($rightPos - 1) })
             $leftPos--
             $rightPos--
         }
-        if ($leftPos -gt $previousLeftPos) { $ops.Add(@{ Kind = 'Deleted'; LeftIndex = ($leftPos - 1); RightIndex = $null }) }
-        else { $ops.Add(@{ Kind = 'Added'; LeftIndex = $null; RightIndex = ($rightPos - 1) }) }
+        if ($leftPos -gt $previousLeftPos) { $keptOps.Add(@{ Kind = 'Deleted'; LeftIndex = ($leftPos - 1); RightIndex = $null }) }
+        else { $keptOps.Add(@{ Kind = 'Added'; LeftIndex = $null; RightIndex = ($rightPos - 1) }) }
         $leftPos = $previousLeftPos
         $rightPos = $previousRightPos
     }
     while ($leftPos -gt 0 -and $rightPos -gt 0) {
-        $ops.Add(@{ Kind = 'Same'; LeftIndex = ($leftPos - 1); RightIndex = ($rightPos - 1) })
+        $keptOps.Add(@{ Kind = 'Same'; LeftIndex = ($leftPos - 1); RightIndex = ($rightPos - 1) })
         $leftPos--
         $rightPos--
     }
 
-    $ops.Reverse()
+    $keptOps.Reverse()
+
+    # --- 3. 除外した要素を、元の位置に Deleted と Added として戻す ---
+    # 残った要素の操作を元の添字に変換し、その手前にある除外した要素を先に出力する。
+    $ops = [System.Collections.Generic.List[hashtable]]::new()
+    $leftNext = 0
+    $rightNext = 0
+    foreach ($keptOp in $keptOps) {
+        if ($null -ne $keptOp.LeftIndex) {
+            $leftTarget = $keptLeft[$keptOp.LeftIndex]
+            while ($leftNext -lt $leftTarget) { $ops.Add(@{ Kind = 'Deleted'; LeftIndex = $leftNext; RightIndex = $null }); $leftNext++ }
+        }
+        if ($null -ne $keptOp.RightIndex) {
+            $rightTarget = $keptRight[$keptOp.RightIndex]
+            while ($rightNext -lt $rightTarget) { $ops.Add(@{ Kind = 'Added'; LeftIndex = $null; RightIndex = $rightNext }); $rightNext++ }
+        }
+        switch -CaseSensitive ($keptOp.Kind) {
+            'Same' { $ops.Add(@{ Kind = 'Same'; LeftIndex = $leftNext; RightIndex = $rightNext }); $leftNext++; $rightNext++ }
+            'Deleted' { $ops.Add(@{ Kind = 'Deleted'; LeftIndex = $leftNext; RightIndex = $null }); $leftNext++ }
+            'Added' { $ops.Add(@{ Kind = 'Added'; LeftIndex = $null; RightIndex = $rightNext }); $rightNext++ }
+        }
+    }
+    while ($leftNext -lt $Left.Length) { $ops.Add(@{ Kind = 'Deleted'; LeftIndex = $leftNext; RightIndex = $null }); $leftNext++ }
+    while ($rightNext -lt $Right.Length) { $ops.Add(@{ Kind = 'Added'; LeftIndex = $null; RightIndex = $rightNext }); $rightNext++ }
+
     return $ops
 }
