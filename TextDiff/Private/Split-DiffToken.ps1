@@ -24,24 +24,16 @@ function Split-DiffToken {
         [Parameter(Mandatory)] [AllowEmptyString()] [string]$Text
     )
 
-    $tokens = [System.Collections.Generic.List[string]]::new()
-    if ($Text.Length -eq 0) { return $tokens.ToArray() }
+    if ($Text.Length -eq 0) { return [string[]]@() }
 
-    $buffer = [System.Text.StringBuilder]::new()
-    foreach ($ch in $Text.ToCharArray()) {
-        # [A-Za-z0-9_] だけを語の構成文字とする。Char.IsLetterOrDigit では日本語も語に含まれ、
-        # 長い日本語の文字列が 1 トークンになって、変更箇所を示せなくなる。
-        # 記号を 1 文字ずつのトークンにするのは、括弧やハイフンをまたぐ変更を、その部分だけ示すため。
-        $isWord = ($ch -ge 'a' -and $ch -le 'z') -or ($ch -ge 'A' -and $ch -le 'Z') -or ($ch -ge '0' -and $ch -le '9') -or ($ch -ceq '_')
-        if ($isWord) {
-            [void]$buffer.Append($ch)
-        }
-        else {
-            if ($buffer.Length -gt 0) { $tokens.Add($buffer.ToString()); [void]$buffer.Clear() }
-            $tokens.Add([string]$ch)
-        }
-    }
-    if ($buffer.Length -gt 0) { $tokens.Add($buffer.ToString()) }
-
-    return $tokens.ToArray()
+    # [A-Za-z0-9_] だけを語の構成文字とする。Char.IsLetterOrDigit では日本語も語に含まれ、
+    # 長い日本語の文字列が 1 トークンになって、変更箇所を示せなくなる。
+    # 記号を 1 文字ずつのトークンにするのは、括弧やハイフンをまたぐ変更を、その部分だけ示すため。
+    # PowerShell のループで 1 文字ずつ判定する方法も、正規表現の一致を for で 1 つずつ取り出す方法も遅いため、
+    # 一致の Value をメンバーの列挙でまとめて取り出す。
+    # 1000 行で、1 文字ずつ判定する方法の約 300 ミリ秒に対して約 160 ミリ秒だった（Windows PowerShell 5.1 での実測）。
+    # Regex.Split の結果から -cne '' で空文字を除く方法は使わない。-cne はカルチャーに依存する比較で、
+    # ソフトハイフンなどの無視される文字を空文字と等しいと判定し、トークンごと除いてしまう。
+    # [\s\S] は UTF-16 のコード単位 1 つに一致し、改行も含めて取りこぼさない。
+    return [string[]]([regex]::Matches($Text, '[A-Za-z0-9_]+|[\s\S]').Value)
 }

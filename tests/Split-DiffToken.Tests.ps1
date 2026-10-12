@@ -39,6 +39,28 @@ Describe "Split-DiffToken" {
         }
     }
 
+    It "語の構成文字は ASCII の英数字とアンダースコアだけ" {
+        InModuleScope TextDiff {
+            # 範囲の境界の前後の記号、全角数字、大文字と小文字の変換で英字に対応する文字（ケルビン記号 U+212A）を確認する。
+            $text = 'a/0:9@A[Z`z{１' + [string][char]0x212A + 'b'
+
+            Split-DiffToken -Text $text | Should -BeExactly @('a', '/', '0', ':', '9', '@', 'A', '[', 'Z', '`', 'z', '{', '１', [string][char]0x212A, 'b')
+        }
+    }
+
+    It "カルチャーに依存する比較で無視される文字も、トークンとして残す" {
+        InModuleScope TextDiff {
+            # ソフトハイフン（U+00AD）、ゼロ幅非接合子（U+200C）、NUL（U+0000）は、カルチャーに依存する比較では
+            # 空文字と等しいと判定される。空文字と比較して除くと、これらの文字が差分の表示から欠落するため。
+            $text = 'a' + [string][char]0x00AD + 'b' + [string][char]0x200C + [string][char]0x0000
+
+            $tokens = @(Split-DiffToken -Text $text)
+
+            $tokens.Count | Should -BeExactly 5
+            (-join $tokens) | Should -BeExactly $text
+        }
+    }
+
     It "連結すると元の文字列と一致する" {
         InModuleScope TextDiff {
             $text = '  A001,1,SampleCode,2026-08-17,ops@example.com'
