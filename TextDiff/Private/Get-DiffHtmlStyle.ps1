@@ -39,7 +39,7 @@ function Get-DiffHtmlStyle {
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--ground); color: var(--ink);
          font-family: "Yu Gothic UI", "Meiryo", "Segoe UI", system-ui, sans-serif; }
-  .wrap { max-width: 1400px; margin: 0 auto; padding: 28px 20px 64px; }
+  .wrap { padding: 28px 20px 64px; }
   h1 { font-size: 19px; margin: 0 0 20px; }
   .card { background: var(--surface); border: 1px solid var(--rule); border-radius: 5px;
           overflow: hidden; margin-bottom: 22px; }
