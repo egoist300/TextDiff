@@ -25,7 +25,7 @@ function Get-DiffHtmlStyle {
     --mod-bg: #ffd9a8; --mod-ink: #7a3d00;
     --warn-ink: #8a1f1f; --warn-bg: #fdeaea;
     --gutter: #f0f3f6; --code-ink: #1c242c;
-    --map-width: 30px;
+    --map-width: 60px;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
