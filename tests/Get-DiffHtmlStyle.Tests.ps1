@@ -28,6 +28,16 @@ Describe "Get-DiffHtmlStyle" {
         }
     }
 
+    It "差分マップの印は、削除と追加の文字色で塗りつぶす" {
+        InModuleScope TextDiff {
+            # 印は高さ 4px まで小さくなるため、凡例と同じ薄い背景色では目に留まらない。
+            $style = Get-DiffHtmlStyle
+
+            $style | Should -MatchExactly '\.map \.d \{[^}]*background: var\(--del-ink\)'
+            $style | Should -MatchExactly '\.map \.a \{[^}]*background: var\(--add-ink\)'
+        }
+    }
+
     It "スタイルは変更箇所の強調の色を定義する" {
         InModuleScope TextDiff {
             # 変更箇所を示すオレンジ。

@@ -58,8 +58,8 @@ function Get-DiffHtmlStyle {
   .map { flex: none; width: var(--map-width); position: relative; cursor: pointer;
          background: var(--gutter); border-left: 1px solid var(--rule); }
   .map i { position: absolute; width: calc(50% - 3px); min-height: 4px; border-radius: 1px; }
-  .map .d { left: 2px; }
-  .map .a { right: 2px; }
+  .map .d { left: 2px; background: var(--del-ink); }
+  .map .a { right: 2px; background: var(--add-ink); }
   table { border-collapse: collapse; width: 100%;
           font-family: "Cascadia Code", "Consolas", monospace; font-size: 12.5px;
           line-height: 1.6; color: var(--code-ink); }
@@ -84,8 +84,8 @@ function Get-DiffHtmlStyle {
             border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--ink-soft); }
   .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 2px;
               margin-right: 6px; vertical-align: -1px; }
-  .legend .d, .map .d { background: var(--del-bg); border: 1px solid var(--del-ink); }
-  .legend .a, .map .a { background: var(--add-bg); border: 1px solid var(--add-ink); }
+  .legend .d { background: var(--del-bg); border: 1px solid var(--del-ink); }
+  .legend .a { background: var(--add-bg); border: 1px solid var(--add-ink); }
   .legend .m { background: var(--mod-bg); border: 1px solid var(--mod-ink); }
   .legend .e { background: var(--gutter); border: 1px solid var(--rule); }
   .legend .p { background: linear-gradient(90deg, var(--del-ink) 50%, var(--add-ink) 50%); }
