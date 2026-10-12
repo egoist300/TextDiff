@@ -18,6 +18,7 @@ function Get-DiffHtmlLegend {
     <span><i class="a"></i>追加された行</span>
     <span><i class="m"></i>行内の変更箇所</span>
     <span><i class="e"></i>反対側に対応する行が無い</span>
+    <span><i class="p"></i>右端の帯：差分の位置（左半分は変更前、右半分は変更後。クリックすると、その位置を表示）</span>
   </div>
 '@
 }

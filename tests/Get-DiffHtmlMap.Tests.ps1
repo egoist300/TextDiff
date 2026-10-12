@@ -32,16 +32,16 @@ Describe "Get-DiffHtmlMap" {
         }
     }
 
-    It "変更・削除・追加の印は、凡例と同じクラスで区別する" {
+    It "変更前の列には削除・変更された行、変更後の列には追加・変更された行の印を付ける" {
         InModuleScope TextDiff {
+            # 行の種類は Same, Changed, Deleted。変更された行は両方の列に印を付ける。
             $rows = @(Get-DiffAlignment -BeforeLines @('id bigint,', 'name varchar(100),', 'note text,') -AfterLines @('id bigint,', 'name varchar(20),'))
-            $addedRows = @(Get-DiffAlignment -BeforeLines @('a') -AfterLines @('a', 'b'))
 
             $map = Get-DiffHtmlMap -Rows $rows
 
-            $map | Should -MatchExactly '<i class="m" style="top: 33\.333%'
-            $map | Should -MatchExactly '<i class="d" style="top: 66\.667%'
-            Get-DiffHtmlMap -Rows $addedRows | Should -MatchExactly '<i class="a" '
+            $map | Should -MatchExactly '<i class="d" style="top: 33\.333%; height: 66\.667%"></i>'
+            $map | Should -MatchExactly '<i class="a" style="top: 33\.333%; height: 33\.333%"></i>'
+            ([regex]::Matches($map, '<i ')).Count | Should -BeExactly 2
         }
     }
 
