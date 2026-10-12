@@ -90,10 +90,18 @@ function ConvertTo-DiffHtml {
         # 変更前と変更後を左右に並べ、片側にしか無い行を斜線で示す。変更・削除・追加を位置で区別できる。
         # 削除行と追加行を上下に並べる表示では、どの行が対応するのか読み取れない。
         # HTML は保存して後から読むため、ConvertTo-DiffText と異なり行を省略しない。
+        # 行内の差分は左右のペインで共有する。ペインごとに計算すると、HTML の生成で最も時間がかかる処理を
+        # 変更行ごとに 2 回実行することになる。
+        $inlineDiffs = @{}
+        for ($rowIndex = 0; $rowIndex -lt $rows.Count; $rowIndex++) {
+            if ($rows[$rowIndex].Kind -ceq 'Changed') {
+                $inlineDiffs[$rowIndex] = Get-InlineDiff -Left $rows[$rowIndex].Left -Right $rows[$rowIndex].Right
+            }
+        }
         [void]$builder.AppendLine('  <div class="side"><div>変更前</div><div>変更後</div></div>')
         [void]$builder.AppendLine('  <div class="panes">')
-        [void]$builder.AppendLine((Get-DiffHtmlPane -Rows $rows -Side 'left'))
-        [void]$builder.AppendLine((Get-DiffHtmlPane -Rows $rows -Side 'right'))
+        [void]$builder.AppendLine((Get-DiffHtmlPane -Rows $rows -InlineDiffs $inlineDiffs -Side 'left'))
+        [void]$builder.AppendLine((Get-DiffHtmlPane -Rows $rows -InlineDiffs $inlineDiffs -Side 'right'))
         [void]$builder.AppendLine('  </div>')
         [void]$builder.AppendLine((Get-DiffHtmlLegend))
         [void]$builder.AppendLine('</div>')

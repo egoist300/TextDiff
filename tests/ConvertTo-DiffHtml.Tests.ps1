@@ -130,6 +130,26 @@ Describe "ConvertTo-DiffHtml" {
             }
         }
 
+        It "変更行の行内の差分は、左右のペインで共有し 1 回だけ計算する" {
+            InModuleScope TextDiff {
+                # 行内の差分の計算は HTML の生成で最も時間がかかる処理のため、ペインごとに計算しない。
+                Mock -CommandName Get-InlineDiff -MockWith {
+                    @{
+                        Left  = @([PSCustomObject]@{ PSTypeName = 'TextDiff.Segment'; Text = 'before'; Changed = $true })
+                        Right = @([PSCustomObject]@{ PSTypeName = 'TextDiff.Segment'; Text = 'after'; Changed = $true })
+                    }
+                }
+
+                $html = ConvertTo-DiffHtml -Title 'T' -Sections @(
+                    New-Section -Before @('    name character varying(100),') -After @('    name character varying(20),')
+                )
+
+                Should -Invoke -CommandName Get-InlineDiff -Times 1 -Exactly
+                $html | Should -MatchExactly '<b>before</b>'
+                $html | Should -MatchExactly '<b>after</b>'
+            }
+        }
+
         It "対応付けていない削除行と追加行は強調しない" {
             InModuleScope TextDiff {
                 $html = ConvertTo-DiffHtml -Title 'T' -Sections @(
