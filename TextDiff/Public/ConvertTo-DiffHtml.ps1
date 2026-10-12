@@ -8,6 +8,7 @@ function ConvertTo-DiffHtml {
         セクション（比較する対象のファイルなど）ごとに 1 つのカードを作成し、変更前と変更後の
         2 つのペインを左右に並べます。左右のペインのスクロールは、埋め込んだ JavaScript で同期します。
         JavaScript が無効な環境でも、各ペインを個別にスクロールして閲覧できます。
+        変更後のペインの右には、差分の位置を示す差分マップを置きます。クリックすると、その位置を表示します。
 
         CSS と JavaScript は HTML に埋め込み、外部のファイルは読み込みません。
         見出しや凡例などの文言は日本語です。
@@ -102,6 +103,8 @@ function ConvertTo-DiffHtml {
         [void]$builder.AppendLine('  <div class="panes">')
         [void]$builder.AppendLine((Get-DiffHtmlPane -Rows $rows -InlineDiffs $inlineDiffs -Side 'left'))
         [void]$builder.AppendLine((Get-DiffHtmlPane -Rows $rows -InlineDiffs $inlineDiffs -Side 'right'))
+        # 差分マップはスクロールバーの隣に置き、印の付いたスクロールバーとして読めるようにする。
+        [void]$builder.AppendLine((Get-DiffHtmlMap -Rows $rows))
         [void]$builder.AppendLine('  </div>')
         [void]$builder.AppendLine((Get-DiffHtmlLegend))
         [void]$builder.AppendLine('</div>')

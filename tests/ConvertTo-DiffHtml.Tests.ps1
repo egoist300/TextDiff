@@ -197,6 +197,20 @@ Describe "ConvertTo-DiffHtml" {
                 $html | Should -MatchExactly '<td class="ln">2</td>'
             }
         }
+
+        It "差分マップは変更後のペインの右に配置する" {
+            InModuleScope TextDiff {
+                # スクロールバーの隣に置き、印の付いたスクロールバーとして読めるようにするため。
+                $html = ConvertTo-DiffHtml -Title 'T' -Sections @(
+                    New-Section -Before @('a') -After @('a', 'b')
+                )
+
+                $rightPane = $html.IndexOf('<div class="pane right">', [System.StringComparison]::Ordinal)
+                $map = $html.IndexOf('<div class="map"', [System.StringComparison]::Ordinal)
+                $rightPane | Should -BeGreaterThan -1
+                $map | Should -BeGreaterThan $rightPane
+            }
+        }
     }
 
     Context "差分なし・検証不能" {

@@ -15,6 +15,7 @@ function Get-DiffHtmlStyle {
     param()
 
     # 削除行を赤にしないのは、削除は正常な結果であり、失敗と混同させないため。赤は比較できなかったセクションだけに使う。
+    # 見出し（.side）の右に差分マップと同じ幅の余白を置くのは、変更前と変更後の見出しの境界をペインの境界に揃えるため。
     return @'
   :root {
     --ground: #f6f8fa; --surface: #ffffff; --surface-alt: #eef2f6;
@@ -24,6 +25,7 @@ function Get-DiffHtmlStyle {
     --mod-bg: #ffd9a8; --mod-ink: #7a3d00;
     --warn-ink: #8a1f1f; --warn-bg: #fdeaea;
     --gutter: #f0f3f6; --code-ink: #1c242c;
+    --map-width: 15px;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -46,12 +48,16 @@ function Get-DiffHtmlStyle {
   .card-head { padding: 10px 14px; border-bottom: 1px solid var(--rule);
                background: var(--surface-alt); font-size: 14px; font-weight: 700; }
   .side { display: flex; font-size: 12px; color: var(--ink-soft);
-          border-bottom: 1px solid var(--rule); background: var(--surface-alt); }
+          border-bottom: 1px solid var(--rule); background: var(--surface-alt);
+          padding-right: var(--map-width); }
   .side div { width: 50%; padding: 5px 14px; }
   .side div + div { border-left: 1px solid var(--rule); }
   .panes { display: flex; }
   .pane { width: 50%; overflow: auto; max-height: 70vh; }
   .pane + .pane { border-left: 1px solid var(--rule); }
+  .map { flex: none; width: var(--map-width); position: relative; cursor: pointer;
+         background: var(--gutter); border-left: 1px solid var(--rule); }
+  .map i { position: absolute; left: 2px; right: 2px; min-height: 4px; border-radius: 1px; }
   table { border-collapse: collapse; width: 100%;
           font-family: "Cascadia Code", "Consolas", monospace; font-size: 12.5px;
           line-height: 1.6; color: var(--code-ink); }
@@ -76,9 +82,9 @@ function Get-DiffHtmlStyle {
             border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--ink-soft); }
   .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 2px;
               margin-right: 6px; vertical-align: -1px; }
-  .legend .d { background: var(--del-bg); border: 1px solid var(--del-ink); }
-  .legend .a { background: var(--add-bg); border: 1px solid var(--add-ink); }
-  .legend .m { background: var(--mod-bg); border: 1px solid var(--mod-ink); }
+  .legend .d, .map .d { background: var(--del-bg); border: 1px solid var(--del-ink); }
+  .legend .a, .map .a { background: var(--add-bg); border: 1px solid var(--add-ink); }
+  .legend .m, .map .m { background: var(--mod-bg); border: 1px solid var(--mod-ink); }
   .legend .e { background: var(--gutter); border: 1px solid var(--rule); }
 '@
 }
