@@ -13,21 +13,24 @@ function Get-DiffHtmlScript {
 
     return @'
 // 左右のペインのスクロール位置を同期する。
+// 同期はセクションごとに行う。文書全体で行うと、1 つのセクションのスクロールで他のセクションまで動く。
 // 動かない環境でも各ペインは独立にスクロールできるため、閲覧自体は成立する。
 (function () {
-  var panes = Array.prototype.slice.call(document.querySelectorAll('.pane'));
-  var syncing = false;
-  panes.forEach(function (pane) {
-    pane.addEventListener('scroll', function () {
-      if (syncing) { return; }
-      syncing = true;
-      panes.forEach(function (other) {
-        if (other !== pane) {
-          other.scrollLeft = pane.scrollLeft;
-          other.scrollTop = pane.scrollTop;
-        }
+  Array.prototype.forEach.call(document.querySelectorAll('.panes'), function (group) {
+    var panes = Array.prototype.slice.call(group.querySelectorAll('.pane'));
+    var syncing = false;
+    panes.forEach(function (pane) {
+      pane.addEventListener('scroll', function () {
+        if (syncing) { return; }
+        syncing = true;
+        panes.forEach(function (other) {
+          if (other !== pane) {
+            other.scrollLeft = pane.scrollLeft;
+            other.scrollTop = pane.scrollTop;
+          }
+        });
+        syncing = false;
       });
-      syncing = false;
     });
   });
 })();

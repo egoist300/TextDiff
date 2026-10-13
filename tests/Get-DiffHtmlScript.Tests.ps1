@@ -22,6 +22,16 @@ Describe "Get-DiffHtmlScript" {
         }
     }
 
+    It "スクロールは同じセクションの左右のペインだけで同期する" {
+        InModuleScope TextDiff {
+            # 文書全体のペインを同期すると、1 つのセクションのスクロールで他のセクションまで動くため。
+            $script = Get-DiffHtmlScript
+
+            $script | Should -MatchExactly "document\.querySelectorAll\('\.panes'\)"
+            $script | Should -Not -MatchExactly "document\.querySelectorAll\('\.pane'\)"
+        }
+    }
+
     It "差分マップのクリックを受け付ける" {
         InModuleScope TextDiff {
             Get-DiffHtmlScript | Should -MatchExactly "querySelectorAll\('\.map'\)"
