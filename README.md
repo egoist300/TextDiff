@@ -7,6 +7,7 @@
 - 行の対応付けに Myers 法を使用します。変更行が少ないほど高速で、1000 行のうち 5 行に変更がある場合に約 14 ミリ秒でした（Windows PowerShell 5.1 での実測）
 - 隣接する削除行と追加行のうち、類似する組だけを 1 行の変更として対応付け、行内の変更箇所を単語単位で検出します
 - HTML は CSS と JavaScript を埋め込んだ単一のファイルで、外部のリソースを読み込みません。別のマシンにコピーしても同じ表示になります
+- HTML の各セクションの右端に、差分の位置を示す差分マップを表示します。クリックすると、その位置へスクロールします
 
 HTML の見出しや凡例などの文言は日本語です。
 
@@ -17,17 +18,17 @@ Windows PowerShell 5.1。
 ## インストール
 
 ```powershell
-Install-Module -Name TextDiff -Scope CurrentUser -RequiredVersion 1.0.0
+Install-Module -Name TextDiff -Scope CurrentUser -RequiredVersion 1.0.1
 ```
 
-`C:\Users\<ユーザー名>\Documents\WindowsPowerShell\Modules\TextDiff\1.0.0\` にインストールされます。
+`C:\Users\<ユーザー名>\Documents\WindowsPowerShell\Modules\TextDiff\1.0.1\` にインストールされます。
 
 インターネットに接続できない環境で使用する場合は、接続できる環境で保存してから、フォルダごとコピーします。
 
 ```powershell
-Save-Module -Name TextDiff -RequiredVersion 1.0.0 -Path .\Modules
+Save-Module -Name TextDiff -RequiredVersion 1.0.1 -Path .\Modules
 # コピー先の環境で
-Import-Module -Name .\Modules\TextDiff\1.0.0\TextDiff.psd1
+Import-Module -Name .\Modules\TextDiff\1.0.1\TextDiff.psd1
 ```
 
 ## 使い方
