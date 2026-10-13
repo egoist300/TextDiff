@@ -22,6 +22,12 @@ Describe "Get-DiffHtmlScript" {
         }
     }
 
+    It "差分マップのクリックを受け付ける" {
+        InModuleScope TextDiff {
+            Get-DiffHtmlScript | Should -MatchExactly "querySelectorAll\('\.map'\)"
+        }
+    }
+
 }
 
 AfterAll {

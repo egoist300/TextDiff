@@ -79,6 +79,34 @@ Describe "Get-MyersOperation" {
         }
     }
 
+    It "相手側に一致が無い要素を途中に含んでも、各要素を元の順序で 1 回ずつ含む" {
+        InModuleScope TextDiff {
+            # 9 と 8 は相手側に一致が無い。除外してから比較しても、元の位置に削除と追加として戻す必要がある。
+            $ops = @(Get-MyersOperation -Left @(1, 9, 2, 3) -Right @(1, 2, 8, 3))
+
+            @($ops | Where-Object -FilterScript { $null -ne $_.LeftIndex } | ForEach-Object -Process { $_.LeftIndex }) | Should -BeExactly @(0, 1, 2, 3)
+            @($ops | Where-Object -FilterScript { $null -ne $_.RightIndex } | ForEach-Object -Process { $_.RightIndex }) | Should -BeExactly @(0, 1, 2, 3)
+            @($ops | Where-Object -FilterScript { $_.Kind -ceq 'Same' } | ForEach-Object -Process { '{0}-{1}' -f $_.LeftIndex, $_.RightIndex }) | Should -BeExactly @('0-0', '2-1', '3-3')
+            @($ops | Where-Object -FilterScript { $_.Kind -ceq 'Deleted' } | ForEach-Object -Process { $_.LeftIndex }) | Should -BeExactly @(1)
+            @($ops | Where-Object -FilterScript { $_.Kind -ceq 'Added' } | ForEach-Object -Process { $_.RightIndex }) | Should -BeExactly @(2)
+        }
+    }
+
+    It "すべての要素が異なる大きな入力でも、短時間で比較できる" {
+        InModuleScope TextDiff {
+            # 一致が無い要素を除外せずに比較すると、3000 要素同士で 20 秒以上かかる。
+            # 除外すると 1 秒もかからないため、遅い環境でも誤判定しないよう上限を 5 秒にしている。
+            $left = [int[]](1..3000)
+            $right = [int[]](3001..6000)
+
+            $elapsed = Measure-Command -Expression { $script:ops = @(Get-MyersOperation -Left $left -Right $right) }
+
+            $elapsed.TotalSeconds | Should -BeLessThan 5
+            $script:ops.Count | Should -BeExactly 6000
+            @($script:ops | Where-Object -FilterScript { $_.Kind -ceq 'Same' }).Count | Should -BeExactly 0
+        }
+    }
+
     It "Same は両側の添字を持つ" {
         InModuleScope TextDiff {
             # 片方が $null だと、対応付けた行の行番号を表示できないため。

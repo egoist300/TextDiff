@@ -15,6 +15,7 @@ function Get-DiffHtmlStyle {
     param()
 
     # 削除行を赤にしないのは、削除は正常な結果であり、失敗と混同させないため。赤は比較できなかったセクションだけに使う。
+    # 見出し（.side）の右に差分マップと同じ幅の余白を置くのは、変更前と変更後の見出しの境界をペインの境界に揃えるため。
     return @'
   :root {
     --ground: #f6f8fa; --surface: #ffffff; --surface-alt: #eef2f6;
@@ -24,6 +25,7 @@ function Get-DiffHtmlStyle {
     --mod-bg: #ffd9a8; --mod-ink: #7a3d00;
     --warn-ink: #8a1f1f; --warn-bg: #fdeaea;
     --gutter: #f0f3f6; --code-ink: #1c242c;
+    --map-width: 60px;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -39,19 +41,25 @@ function Get-DiffHtmlStyle {
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--ground); color: var(--ink);
          font-family: "Yu Gothic UI", "Meiryo", "Segoe UI", system-ui, sans-serif; }
-  .wrap { max-width: 1400px; margin: 0 auto; padding: 28px 20px 64px; }
+  .wrap { padding: 28px 20px 64px; }
   h1 { font-size: 19px; margin: 0 0 20px; }
   .card { background: var(--surface); border: 1px solid var(--rule); border-radius: 5px;
           overflow: hidden; margin-bottom: 22px; }
   .card-head { padding: 10px 14px; border-bottom: 1px solid var(--rule);
                background: var(--surface-alt); font-size: 14px; font-weight: 700; }
   .side { display: flex; font-size: 12px; color: var(--ink-soft);
-          border-bottom: 1px solid var(--rule); background: var(--surface-alt); }
+          border-bottom: 1px solid var(--rule); background: var(--surface-alt);
+          padding-right: var(--map-width); }
   .side div { width: 50%; padding: 5px 14px; }
   .side div + div { border-left: 1px solid var(--rule); }
   .panes { display: flex; }
   .pane { width: 50%; overflow: auto; max-height: 70vh; }
   .pane + .pane { border-left: 1px solid var(--rule); }
+  .map { flex: none; width: var(--map-width); position: relative; cursor: pointer;
+         background: var(--gutter); border-left: 1px solid var(--rule); }
+  .map i { position: absolute; width: calc(50% - 3px); min-height: 4px; border-radius: 1px; }
+  .map .d { left: 2px; background: var(--del-ink); }
+  .map .a { right: 2px; background: var(--add-ink); }
   table { border-collapse: collapse; width: 100%;
           font-family: "Cascadia Code", "Consolas", monospace; font-size: 12.5px;
           line-height: 1.6; color: var(--code-ink); }
@@ -80,5 +88,6 @@ function Get-DiffHtmlStyle {
   .legend .a { background: var(--add-bg); border: 1px solid var(--add-ink); }
   .legend .m { background: var(--mod-bg); border: 1px solid var(--mod-ink); }
   .legend .e { background: var(--gutter); border: 1px solid var(--rule); }
+  .legend .p { background: linear-gradient(90deg, var(--del-ink) 50%, var(--add-ink) 50%); }
 '@
 }

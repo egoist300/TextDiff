@@ -22,6 +22,13 @@ Describe "Get-DiffHtmlLegend" {
         }
     }
 
+    It "凡例は差分マップの見方と操作を説明する" {
+        InModuleScope TextDiff {
+            # 差分マップには見出しが無く、説明が無いと、クリックで移動できることに気づけないため。
+            Get-DiffHtmlLegend | Should -MatchExactly '右端の帯.*クリック'
+        }
+    }
+
 }
 
 AfterAll {

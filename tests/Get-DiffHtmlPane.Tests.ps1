@@ -21,8 +21,8 @@ Describe "Get-DiffHtmlPane" {
             # 左右が同じだと、横スクロールの同期が片側にしか適用されないため。
             $rows = @(Get-DiffAlignment -BeforeLines @('a') -AfterLines @('b'))
 
-            $left = Get-DiffHtmlPane -Rows $rows -Side 'left'
-            $right = Get-DiffHtmlPane -Rows $rows -Side 'right'
+            $left = Get-DiffHtmlPane -Rows $rows -InlineDiffs @{} -Side 'left'
+            $right = Get-DiffHtmlPane -Rows $rows -InlineDiffs @{} -Side 'right'
 
             $left | Should -Not -BeExactly $right
         }
@@ -32,20 +32,39 @@ Describe "Get-DiffHtmlPane" {
         InModuleScope TextDiff {
             $rows = @(Get-DiffAlignment -BeforeLines @('alpha') -AfterLines @('beta'))
 
-            (Get-DiffHtmlPane -Rows $rows -Side 'left') | Should -MatchExactly 'alpha'
-            (Get-DiffHtmlPane -Rows $rows -Side 'right') | Should -MatchExactly 'beta'
+            (Get-DiffHtmlPane -Rows $rows -InlineDiffs @{} -Side 'left') | Should -MatchExactly 'alpha'
+            (Get-DiffHtmlPane -Rows $rows -InlineDiffs @{} -Side 'right') | Should -MatchExactly 'beta'
+        }
+    }
+
+    It "変更行は、渡された行内の差分で変更箇所を強調する" {
+        InModuleScope TextDiff {
+            $rows = @(Get-DiffAlignment -BeforeLines @('    name character varying(100),') -AfterLines @('    name character varying(20),'))
+            $inlineDiffs = @{ 0 = (Get-InlineDiff -Left $rows[0].Left -Right $rows[0].Right) }
+
+            (Get-DiffHtmlPane -Rows $rows -InlineDiffs $inlineDiffs -Side 'left') | Should -MatchExactly '<b>100</b>'
+            (Get-DiffHtmlPane -Rows $rows -InlineDiffs $inlineDiffs -Side 'right') | Should -MatchExactly '<b>20</b>'
+        }
+    }
+
+    It "変更行の行内の差分が渡されないと失敗する" {
+        InModuleScope TextDiff {
+            # 渡されないまま出力すると、変更行の内容が空になり、差分が欠落するため。
+            $rows = @(Get-DiffAlignment -BeforeLines @('    name character varying(100),') -AfterLines @('    name character varying(20),'))
+
+            { Get-DiffHtmlPane -Rows $rows -InlineDiffs @{} -Side 'left' } | Should -Throw -ExceptionType ([System.ArgumentException])
         }
     }
 
     It "行が無くてもペインを生成できる" {
         InModuleScope TextDiff {
-            { Get-DiffHtmlPane -Rows @() -Side 'left' } | Should -Not -Throw
+            { Get-DiffHtmlPane -Rows @() -InlineDiffs @{} -Side 'left' } | Should -Not -Throw
         }
     }
 
     It "左右以外の側は受け付けない" {
         InModuleScope TextDiff {
-            { Get-DiffHtmlPane -Rows @() -Side 'center' } | Should -Throw
+            { Get-DiffHtmlPane -Rows @() -InlineDiffs @{} -Side 'center' } | Should -Throw
         }
     }
 

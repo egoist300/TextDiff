@@ -8,6 +8,9 @@ function Get-DiffHtmlPane {
         反対側にしか無い行の位置には空行を配置し、斜線で対応する行が無いことを示します。
     .PARAMETER Rows
         Get-DiffAlignment が返す行の対応付け（TextDiff.DiffRow の配列）。それ以外は受け付けません。
+    .PARAMETER InlineDiffs
+        変更行（Kind が Changed の行）の行内の差分。キーは Rows の添字、値は Get-InlineDiff の戻り値です。
+        すべての変更行について指定します。指定が無い変更行があると、ArgumentException で失敗します。
     .PARAMETER Side
         生成する側。'left' は変更前、'right' は変更後です。
     .OUTPUTS
@@ -17,6 +20,7 @@ function Get-DiffHtmlPane {
     [OutputType([string])]
     param(
         [Parameter(Mandatory)] [AllowEmptyCollection()] [PSTypeName('TextDiff.DiffRow')] [psobject[]]$Rows,
+        [Parameter(Mandatory)] [hashtable]$InlineDiffs,
         [Parameter(Mandatory)] [ValidateSet('left', 'right', IgnoreCase = $false)] [string]$Side
     )
 
@@ -24,7 +28,8 @@ function Get-DiffHtmlPane {
     [void]$builder.AppendLine("    <div class=""pane $Side"">")
     [void]$builder.AppendLine('      <table>')
 
-    foreach ($row in $Rows) {
+    for ($rowIndex = 0; $rowIndex -lt $Rows.Count; $rowIndex++) {
+        $row = $Rows[$rowIndex]
         $isLeft = ($Side -ceq 'left')
         $number = if ($isLeft) { $row.LeftNo } else { $row.RightNo }
         $text = if ($isLeft) { $row.Left } else { $row.Right }
@@ -43,7 +48,10 @@ function Get-DiffHtmlPane {
         }
 
         if ($row.Kind -ceq 'Changed') {
-            $inline = Get-InlineDiff -Left $row.Left -Right $row.Right
+            $inline = $InlineDiffs[$rowIndex]
+            if ($null -eq $inline) {
+                throw [System.ArgumentException]::new(("InlineDiffs に変更行の行内の差分がありません（Rows の添字: {0}）" -f $rowIndex), 'InlineDiffs')
+            }
             $body = ConvertTo-HtmlSegment -Segments $(if ($isLeft) { $inline.Left } else { $inline.Right })
         }
         else {
