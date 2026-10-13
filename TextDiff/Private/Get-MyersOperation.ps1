@@ -23,10 +23,8 @@ function Get-MyersOperation {
     )
 
     # --- 1. 相手側に一致が無い要素を除外する ---
-    # 相手側に一致が無い要素は、どの対応付けでも Same にならず、必ず Deleted か Added になる。
-    # 先に除外しても最短の編集の長さは変わらず、Myers 法の計算量だけが減る（GNU diffutils と同じ考え方）。
-    # 除外しないと、すべての要素が異なる 3000 要素同士で約 20 秒かかった（Windows PowerShell 5.1 での実測）。
-    # 残る要素は必ず相手側にも残る要素と一致するため、片側だけが空になることはない。
+    # 相手側に一致が無い要素は必ず Deleted か Added になるため、先に除外して Myers 法の計算量を減らす。
+    # 除外しても最短の編集は変わらず、残る要素は相手側にも必ず残るため、片側だけが空になることはない。
     $leftSet = [System.Collections.Generic.HashSet[int]]::new($Left)
     $rightSet = [System.Collections.Generic.HashSet[int]]::new($Right)
     $keptLeft = [System.Collections.Generic.List[int]]::new()
