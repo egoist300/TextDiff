@@ -1,7 +1,7 @@
 ﻿@{
     RootModule           = 'TextDiff.psm1'
 
-    ModuleVersion        = '1.0.1'
+    ModuleVersion        = '1.0.2'
 
     GUID                 = '38718329-ae50-404c-84c4-0737d396dc3e'
     Author               = 'egoist300'

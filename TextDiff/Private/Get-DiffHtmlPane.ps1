@@ -20,7 +20,7 @@ function Get-DiffHtmlPane {
     [OutputType([string])]
     param(
         [Parameter(Mandatory)] [AllowEmptyCollection()] [PSTypeName('TextDiff.DiffRow')] [psobject[]]$Rows,
-        [Parameter(Mandatory)] [hashtable]$InlineDiffs,
+        [Parameter(Mandatory)] [AllowEmptyCollection()] [System.Collections.Generic.Dictionary[int, hashtable]]$InlineDiffs,
         [Parameter(Mandatory)] [ValidateSet('left', 'right', IgnoreCase = $false)] [string]$Side
     )
 
@@ -48,10 +48,10 @@ function Get-DiffHtmlPane {
         }
 
         if ($row.Kind -ceq 'Changed') {
-            $inline = $InlineDiffs[$rowIndex]
-            if ($null -eq $inline) {
+            if (-not $InlineDiffs.ContainsKey($rowIndex)) {
                 throw [System.ArgumentException]::new(("InlineDiffs に変更行の行内の差分がありません（Rows の添字: {0}）" -f $rowIndex), 'InlineDiffs')
             }
+            $inline = $InlineDiffs[$rowIndex]
             $body = ConvertTo-HtmlSegment -Segments $(if ($isLeft) { $inline.Left } else { $inline.Right })
         }
         else {

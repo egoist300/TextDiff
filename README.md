@@ -18,17 +18,17 @@ Windows PowerShell 5.1。
 ## インストール
 
 ```powershell
-Install-Module -Name TextDiff -Scope CurrentUser -RequiredVersion 1.0.1
+Install-Module -Name TextDiff -Scope CurrentUser -RequiredVersion 1.0.2
 ```
 
-`C:\Users\<ユーザー名>\Documents\WindowsPowerShell\Modules\TextDiff\1.0.1\` にインストールされます。
+`C:\Users\<ユーザー名>\Documents\WindowsPowerShell\Modules\TextDiff\1.0.2\` にインストールされます。
 
 インターネットに接続できない環境で使用する場合は、接続できる環境で保存してから、フォルダごとコピーします。
 
 ```powershell
-Save-Module -Name TextDiff -RequiredVersion 1.0.1 -Path .\Modules
+Save-Module -Name TextDiff -RequiredVersion 1.0.2 -Path .\Modules
 # コピー先の環境で
-Import-Module -Name .\Modules\TextDiff\1.0.1\TextDiff.psd1
+Import-Module -Name .\Modules\TextDiff\1.0.2\TextDiff.psd1
 ```
 
 ## 使い方
