@@ -1,27 +1,11 @@
 ﻿#Requires -Version 5.1
 
-# 書き方の決まり（~/.claude/rules/powershell.md）を、PSScriptAnalyzer のカスタムルールとして検査する。
-#
-# PSScriptAnalyzerSettings.psd1 の CustomRulePath から読み込まれる。CI の lint ジョブと、
-# VS Code の PowerShell 拡張（ワークスペース直下の設定ファイルを自動で読み込む）の両方で実行されるため、
-# 編集中に警告が表示される。ルールが違反を検出できることは tests/CodingRules.Tests.ps1 が確認する。
-#
-# 【PowerShell 自身の名前は、大文字と小文字を区別せずに比較する】
-# コマンド名・引数名・型名・変数名は、PowerShell が大文字と小文字を区別しない。sort-object も
-# Sort-Object として動作するため、ここでの照合は -ieq / -icontains で書く。
-#
-# 【ルールはファイル全体に対して 1 回だけ検査する】
-# ScriptBlockAst を受け取るルールは、入れ子のスクリプトブロックごとにも呼び出される。
-# 毎回すべてを検査すると同じ指摘が重複するため、親の無いブロック（ファイル全体）のときだけ検査する。
-
 Set-StrictMode -Version 3.0
 
 # Pester の構文。名前付きの引数にすると読みにくくなるため、位置指定を許可する。
 $script:PesterDsl = @('Describe', 'Context', 'It', 'BeforeAll', 'AfterAll', 'BeforeEach', 'AfterEach', 'BeforeDiscovery', 'Should', 'Mock', 'InModuleScope')
 
-# 引数の一覧を保持する表は、AppDomain（同じプロセスの中で共有される領域）に保持する。
-# PSScriptAnalyzer はファイルごとに新しい runspace を作成してこのモジュールを読み込み直すため、
-# モジュールの変数に保持するとファイルごとに破棄され、モジュールのソースを毎回解析し直すことになる。
+# PSScriptAnalyzer はファイルごとにこのモジュールを読み込み直すため、引数の表はモジュールの変数ではなく AppDomain に置く。
 # runspace は並行して実行されることがあるため、ConcurrentDictionary にする。
 $script:SharedCacheKey = 'TextDiff.CodingRules.CommandParameterCache'
 $script:ModuleCacheKey = 'TextDiff.CodingRules.ModuleFunctionCache'
@@ -78,6 +62,9 @@ function Test-FileRoot {
     <#
     .SYNOPSIS
         スクリプトブロックがファイル全体（親の無いブロック）かを返す。
+    .DESCRIPTION
+        ScriptBlockAst を受け取るルールは、入れ子のスクリプトブロックごとにも呼ばれます。
+        毎回検査すると同じ指摘が重複するため、各ルールはこの関数が $true を返すときだけ検査します。
     .PARAMETER ScriptBlockAst
         対象のスクリプトブロック。
     #>
