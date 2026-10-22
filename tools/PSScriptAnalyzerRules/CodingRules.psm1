@@ -1,28 +1,11 @@
 ﻿#Requires -Version 5.1
 
-# 書き方の決まり（~/.claude/rules/powershell.md）を、PSScriptAnalyzer のカスタムルールとして検査する。
-#
-# PSScriptAnalyzerSettings.psd1 の CustomRulePath から読み込まれる。CI の lint ジョブと、
-# VS Code の PowerShell 拡張（ワークスペース直下の設定ファイルを自動で読み込む）の両方で実行されるため、
-# 編集中に警告が表示される。ルールが違反を検出できることは tests/CodingRules.Tests.ps1 が確認する。
-#
-# 【PowerShell 自身の名前は、大文字と小文字を区別せずに比較する】
-# コマンド名・引数名・型名・変数名は、PowerShell が大文字と小文字を区別しない。sort-object も
-# Sort-Object として動作するため、ここでの照合は -ieq / -icontains で書く。
-#
-# 【ルールはファイル全体に対して 1 回だけ検査する】
-# ScriptBlockAst を受け取るルールは、入れ子のスクリプトブロックごとにも呼び出される。
-# 毎回すべてを検査すると同じ指摘が重複するため、親の無いブロック（ファイル全体）のときだけ検査する。
-
 Set-StrictMode -Version 3.0
 
 # Pester の構文。名前付きの引数にすると読みにくくなるため、位置指定を許可する。
 $script:PesterDsl = @('Describe', 'Context', 'It', 'BeforeAll', 'AfterAll', 'BeforeEach', 'AfterEach', 'BeforeDiscovery', 'Should', 'Mock', 'InModuleScope')
 
-# 引数の一覧を保持する表は、AppDomain（同じプロセスの中で共有される領域）に保持する。
-# PSScriptAnalyzer はファイルごとに新しい runspace を作成してこのモジュールを読み込み直すため、
-# モジュールの変数に保持するとファイルごとに破棄され、モジュールのソースを毎回解析し直すことになる。
-# runspace は並行して実行されることがあるため、ConcurrentDictionary にする。
+# PSScriptAnalyzer はファイルごとにこのモジュールを読み込み直すため、引数の表はモジュールの変数ではなく AppDomain に置く。
 $script:SharedCacheKey = 'TextDiff.CodingRules.CommandParameterCache'
 $script:ModuleCacheKey = 'TextDiff.CodingRules.ModuleFunctionCache'
 
@@ -30,13 +13,19 @@ function ConvertTo-DiagnosticRecord {
     <#
     .SYNOPSIS
         ルールの指摘を、PSScriptAnalyzer が受け取る DiagnosticRecord に変換する。
+    .DESCRIPTION
+        重大度はすべて Warning にします。
     .PARAMETER RuleName
         ルール名（Measure- を除いた部分）。
     .PARAMETER Message
         指摘の文言。
     .PARAMETER Extent
         指摘する位置。
+    .OUTPUTS
+        [Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord]
     #>
+    [CmdletBinding()]
+    [OutputType([Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticRecord])]
     param(
         [Parameter(Mandatory)] [string]$RuleName,
         [Parameter(Mandatory)] [string]$Message,
@@ -54,23 +43,28 @@ function Find-Node {
     <#
     .SYNOPSIS
         構文木から、指定した型の節をすべて返す。
+    .DESCRIPTION
+        配列を展開して返します。呼び出し側は foreach か @() で受け取ってください。
     .PARAMETER Ast
         検索する範囲の構文木。
     .PARAMETER Type
         検索する節の型。
+    .OUTPUTS
+        [System.Management.Automation.Language.Ast[]]
     #>
+    [CmdletBinding()]
+    [OutputType([System.Management.Automation.Language.Ast[]])]
     param(
         [Parameter(Mandatory)] [System.Management.Automation.Language.Ast]$Ast,
         [Parameter(Mandatory)] [type]$Type
     )
     # 検索結果は呼び出しをまたいで再利用しない。再利用すると、リポジトリ全体に実行したときに別のファイルの節が
     # 返った（並行して実行されるルールの呼び出しどうしで干渉したと考えられる）。
-    # 呼び出しをまたいで保持するのは、スレッドをまたいでも安全な AppDomain の表だけにする。
     $found = [System.Collections.Generic.List[object]]::new()
     foreach ($node in $Ast.FindAll({ $true }, $true)) {
         if ($Type.IsInstanceOfType($node)) { $found.Add($node) }
     }
-    # 配列を展開して返す。呼び出し側は foreach か @() で受け取る（, を付けると、@() が「配列を 1 つ持つ配列」になるため）。
+    # , を付けないのは、付けると呼び出し側の @() が「配列を 1 つ持つ配列」になるため。
     return $found.ToArray()
 }
 
@@ -78,9 +72,16 @@ function Test-FileRoot {
     <#
     .SYNOPSIS
         スクリプトブロックがファイル全体（親の無いブロック）かを返す。
+    .DESCRIPTION
+        ScriptBlockAst を受け取るルールは、入れ子のスクリプトブロックごとにも呼ばれます。
+        毎回検査すると同じ指摘が重複するため、各ルールはこの関数が $true を返すときだけ検査します。
     .PARAMETER ScriptBlockAst
         対象のスクリプトブロック。
+    .OUTPUTS
+        [bool]
     #>
+    [CmdletBinding()]
+    [OutputType([bool])]
     param([Parameter(Mandatory)] [System.Management.Automation.Language.ScriptBlockAst]$ScriptBlockAst)
     return $null -eq $ScriptBlockAst.Parent
 }
@@ -91,7 +92,11 @@ function ConvertFrom-FunctionDefinition {
         関数定義の引数を、{ Name; Aliases; IsSwitch } の配列に変換する。
     .PARAMETER Definition
         関数定義の構文木。
+    .OUTPUTS
+        [PSCustomObject[]]
     #>
+    [CmdletBinding()]
+    [OutputType([PSCustomObject[]])]
     param([Parameter(Mandatory)] [System.Management.Automation.Language.FunctionDefinitionAst]$Definition)
     $parameterAsts = @()
     if ($null -ne $Definition.Body.ParamBlock) { $parameterAsts = @($Definition.Body.ParamBlock.Parameters) }
@@ -115,7 +120,11 @@ function Get-FunctionNameWithoutScope {
         関数名から script: などのスコープ修飾を除去する。
     .PARAMETER Name
         関数定義に書かれた名前。
+    .OUTPUTS
+        [string]
     #>
+    [CmdletBinding()]
+    [OutputType([string])]
     param([Parameter(Mandatory)] [string]$Name)
     return ($Name -ireplace '^(script|global|local):', '')
 }
@@ -124,9 +133,19 @@ function Get-SharedCommandTable {
     <#
     .SYNOPSIS
         Get-Command で取得したコマンド（コマンドレットなど）の引数の一覧を保持する表を返す。
+    .DESCRIPTION
+        表はプロセスの中で 1 つだけ作り、AppDomain に置いて共有します。
+        Get-Command で取得したコマンドの引数は、プロセスが続く限り変化しないためです。
+        コマンド名は大文字と小文字を区別しないため、キーの大文字と小文字を区別しない表を返します。
+        並行して実行されるルールの呼び出しから共有されるため、ConcurrentDictionary で返します。
+    .OUTPUTS
+        [System.Collections.Concurrent.ConcurrentDictionary[string, object]]
     #>
-    # コマンドの引数はプロセスが続く限り変化しないため、プロセスの中で 1 つの表を共有する。
-    # コマンド名は大文字と小文字を区別しないため、表もそれに合わせる。
+    # PSScriptAnalyzer は return , の戻り値を Object[] とみなすが、呼び出し側には , で包んだ値がそのまま届く。
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseOutputTypeCorrectly', '', Justification = 'return , で包んだ値は、そのまま 1 つの値として呼び出し側に届く')]
+    [CmdletBinding()]
+    [OutputType([System.Collections.Concurrent.ConcurrentDictionary[string, object]])]
+    param()
     $table = [System.AppDomain]::CurrentDomain.GetData($script:SharedCacheKey)
     if ($null -eq $table) {
         $table = [System.Collections.Concurrent.ConcurrentDictionary[string, object]]::new([System.StringComparer]::OrdinalIgnoreCase)
@@ -139,18 +158,28 @@ function Get-ModuleFunctionTable {
     <#
     .SYNOPSIS
         TextDiff モジュールの関数（非公開を含む）の引数を、ソースの構文木から読み取った表を返す。
+    .DESCRIPTION
+        モジュールのソースが無ければ、空の表を返します。
+        表は Get-SharedCommandTable と同じく、キーの大文字と小文字を区別しない ConcurrentDictionary です。
+    .OUTPUTS
+        [System.Collections.Concurrent.ConcurrentDictionary[string, object]]
     #>
-    # テストは InModuleScope の中で非公開の関数を呼び出すため、Get-Command では取得できない。ソースから読み取る。
+    # PSScriptAnalyzer は return , の戻り値を Object[] とみなすが、呼び出し側には , で包んだ値がそのまま届く。
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseOutputTypeCorrectly', '', Justification = 'return , で包んだ値は、そのまま 1 つの値として呼び出し側に届く')]
+    [CmdletBinding()]
+    [OutputType([System.Collections.Concurrent.ConcurrentDictionary[string, object]])]
+    param()
     $moduleRoot = Join-Path -Path (Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent) -ChildPath 'TextDiff'
     $emptyTable = [System.Collections.Concurrent.ConcurrentDictionary[string, object]]::new([System.StringComparer]::OrdinalIgnoreCase)
     if (-not (Test-Path -LiteralPath $moduleRoot -PathType Container)) { return , $emptyTable }
     $files = @(Get-ChildItem -LiteralPath $moduleRoot -Recurse -File -Filter '*.ps1')
-    # VS Code で編集している間に引数が変更されうるため、ソースの更新時刻が変化したら読み込み直す。
+    # VS Code で編集している間に引数が変更されうるため、ソースの数か更新時刻が変化したら読み込み直す。
     $signature = '{0}:{1}' -f $files.Count, (@($files | ForEach-Object -Process { $_.LastWriteTimeUtc.Ticks } | Measure-Object -Maximum).Maximum)
 
     $cached = [System.AppDomain]::CurrentDomain.GetData($script:ModuleCacheKey)
     if ($null -ne $cached -and $cached.Signature -ceq $signature) { return , $cached.Table }
 
+    # テストは InModuleScope の中で非公開の関数を呼び出し、それは Get-Command では取得できないため、ソースから読み取る。
     $table = $emptyTable
     foreach ($file in $files) {
         $fileAst = [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$null, [ref]$null)
@@ -166,13 +195,21 @@ function Get-CommandParameterList {
     <#
     .SYNOPSIS
         コマンド名から、その引数の一覧を返す。ネイティブコマンドは $null、見つからなければ空の一覧。
+    .DESCRIPTION
+        検査しているファイルの中で定義された関数、TextDiff モジュールの関数、Get-Command で取得できるコマンドの順に探します。
     .PARAMETER Name
         コマンド名。
     .PARAMETER LocalFunction
         検査しているファイルの中で定義された関数の引数の表（関数名 → 引数の一覧）。
     .PARAMETER ModuleFunction
         Get-ModuleFunctionTable が返す、モジュールの関数の引数の表。
+    .OUTPUTS
+        [PSCustomObject[]] ConvertFrom-FunctionDefinition と同じ形の一覧。
     #>
+    # PSScriptAnalyzer は return , の戻り値を Object[] とみなすが、呼び出し側には , で包んだ値がそのまま届く。
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseOutputTypeCorrectly', '', Justification = 'return , で包んだ値は、そのまま 1 つの値として呼び出し側に届く')]
+    [CmdletBinding()]
+    [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)] [string]$Name,
         [Parameter(Mandatory)] [System.Collections.Generic.Dictionary[string, object]]$LocalFunction,
@@ -202,7 +239,11 @@ function Find-Parameter {
         Get-CommandParameterList が返す引数の一覧。
     .PARAMETER Name
         コマンドに書かれた引数名（- を除く）。
+    .OUTPUTS
+        [PSCustomObject]
     #>
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [AllowNull()] [AllowEmptyCollection()] [object[]]$ParameterList,
         [Parameter(Mandatory)] [string]$Name
@@ -220,7 +261,11 @@ function Test-NonStringOperand {
         式が文字列になりえない定数（数値、$null、$true、$false）かを返す。
     .PARAMETER Operand
         比較演算子の片側の式。
+    .OUTPUTS
+        [bool]
     #>
+    [CmdletBinding()]
+    [OutputType([bool])]
     param([Parameter(Mandatory)] [System.Management.Automation.Language.Ast]$Operand)
     if ($Operand -is [System.Management.Automation.Language.ConstantExpressionAst] -and
         $Operand -isnot [System.Management.Automation.Language.StringConstantExpressionAst]) { return $true }

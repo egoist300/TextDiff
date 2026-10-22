@@ -1,7 +1,5 @@
 ﻿#Requires -Version 5.1
 
-# tools/PSScriptAnalyzerRules/CodingRules.psm1（書き方の決まりのカスタムルール）のテスト。
-#
 # 決まりそのものの検査は PSScriptAnalyzer が行う（CI の lint ジョブと、VS Code の PowerShell 拡張）。
 # ここでは、各ルールが違反を検出し、規約に従った書き方は検出しないことを確認する。
 # ルールが壊れて何も検出しなくなると、リポジトリ全体の検査が無条件に成功するため。
