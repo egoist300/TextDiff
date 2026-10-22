@@ -1,15 +1,11 @@
 ﻿#Requires -Version 5.1
 
-# Get-InlineDiff のテスト。
-#
 # 重視するのは次の 2 点。
 #   ・強調の位置が意味のある単位に揃うこと（桁数なら桁数、日付なら日付）。
 #   ・断片を連結すると必ず元の行と一致すること。一致しないと強調が別の位置に付く。
 
 BeforeAll {
-    # テストのコード自身も StrictMode 3.0 で実行する。モジュールの中は TextDiff.psm1 が設定する。
     Set-StrictMode -Version 3.0
-    # テスト対象はモジュールとして読み込み、テストはモジュールの中（InModuleScope）で実行する。
     # 非公開の関数はモジュールの中からしか呼び出せない。ファイルごとに読み込み直すため、前のファイルが定義した関数は残らない。
     Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\TextDiff\TextDiff.psd1') -Force
     InModuleScope TextDiff {

@@ -1,16 +1,12 @@
 ﻿#Requires -Version 5.1
 
-# Get-DiffAlignment のテスト。
-#
 # 行の対応付けを行うのはこの関数だけで、コンソール表示も HTML 出力もこの結果を使うため、重点的にテストする。
 #
 # 特に重視するのは Changed の判定。隣接する削除行と追加行をすべて対応付けると、
 # 無関係な削除と追加まで変更と誤認し、行内の強調が行全体に付いて読めなくなる。
 
 BeforeAll {
-    # テストのコード自身も StrictMode 3.0 で実行する。モジュールの中は TextDiff.psm1 が設定する。
     Set-StrictMode -Version 3.0
-    # テスト対象はモジュールとして読み込み、テストはモジュールの中（InModuleScope）で実行する。
     # 非公開の関数はモジュールの中からしか呼び出せない。ファイルごとに読み込み直すため、前のファイルが定義した関数は残らない。
     Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\TextDiff\TextDiff.psd1') -Force
     InModuleScope TextDiff {

@@ -1,7 +1,5 @@
 ﻿#Requires -Version 5.1
 
-# ConvertTo-DiffHtml のテスト。
-#
 # 最も重視するのはエスケープ。比較する行には < > & が含まれることがあり、エスケープが漏れると
 # 表示が崩れるだけでなく、内容がタグとして解釈されて表示されない。
 # 差分の内容が欠落するため、正しさの問題として扱う。
@@ -10,9 +8,7 @@
 # 左右を比較できない。
 
 BeforeAll {
-    # テストのコード自身も StrictMode 3.0 で実行する。モジュールの中は TextDiff.psm1 が設定する。
     Set-StrictMode -Version 3.0
-    # テスト対象はモジュールとして読み込み、テストはモジュールの中（InModuleScope）で実行する。
     # 非公開の関数はモジュールの中からしか呼び出せない。ファイルごとに読み込み直すため、前のファイルが定義した関数は残らない。
     Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\TextDiff\TextDiff.psd1') -Force
     InModuleScope TextDiff {
